@@ -1,0 +1,19 @@
+{
+  "name": "tt-digita",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.5.1",
+  "scripts": {
+    "predev": "pnpm --filter @tt-digita/shared build",
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "prebuild": "pnpm --filter @tt-digita/shared build",
+    "build": "pnpm --recursive --filter \"./apps/*\" build",
+    "lint": "pnpm --recursive --filter \"./apps/*\" lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive --filter \"./apps/*\" test",
+    "test:e2e": "pnpm --filter @tt-digita/api test:e2e"
+  }
+}

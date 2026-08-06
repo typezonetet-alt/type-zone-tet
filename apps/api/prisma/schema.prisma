@@ -1,0 +1,313 @@
+// T&T Digita - schema inicial (Fase 0: Fundacao).
+// Cobre so o necessario para autenticacao e organizacao (docs/briefing.md secao 42).
+// Trilhas, exercicios, tentativas, salas ao vivo e ranking entram nas fases seguintes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+  SUPERADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  // Nulo para alunos (login por codigo, briefing secao 5). Obrigatorio/unico para staff.
+  email        String?    @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  lastLoginAt  DateTime?
+
+  student     Student?
+  teacher     Teacher?
+  auditLogs   AuditLog[]
+  hostedRooms LiveRoom[]
+
+  @@index([role])
+}
+
+model Student {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name String
+  // Codigo de login: unico, normalizado (trim + lowercase) na aplicacao antes de gravar.
+  code String @unique
+
+  memberships            ClassMember[]
+  attempts               Attempt[]
+  keystrokeStats         KeystrokeStat[]
+  liveRoomParticipations LiveRoomParticipant[]
+  gameScores             GameScore[]
+
+  createdAt DateTime @default(now())
+}
+
+model Teacher {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name    String
+  classes Class[]
+
+  createdAt DateTime @default(now())
+}
+
+model Class {
+  id     String     @id @default(cuid())
+  name   String
+  course String?
+  shift  String?
+  status UserStatus @default(ACTIVE)
+
+  teacherId String?
+  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  members ClassMember[]
+
+  createdAt DateTime @default(now())
+}
+
+model ClassMember {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([studentId, classId])
+}
+
+// --- Fase 1: motor de exercicio + trilha (docs/briefing.md secao 7-13) ---
+// World = mundo do briefing secao 8. Exercise.order e unico dentro do mundo;
+// a trilha visivel e so a cascata [world.order, exercise.order] em sequencia.
+
+enum ExerciseType {
+  KEY_SEQUENCE
+  WORD_LIST
+  BIGRAM
+  PHRASE
+  NUMBERS
+  PROFESSIONAL_DATA
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AttemptMode {
+  PRACTICE
+}
+
+model World {
+  id    String @id @default(cuid())
+  title String
+  focus String
+  order Int    @unique
+
+  exercises Exercise[]
+
+  createdAt DateTime @default(now())
+}
+
+model Exercise {
+  id    String       @id @default(cuid())
+  title String
+  type  ExerciseType
+
+  worldId String
+  world   World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  // Sequencia de caracteres (KEY_SEQUENCE) ou palavras/frase separadas por
+  // espaco (demais tipos). O tipo hoje e so rotulo -- a mecanica de digitacao
+  // e a mesma pra todos.
+  content     String
+  allowedKeys String[]
+  minAccuracy Float         @default(0.9)
+  targetWpm   Int?
+  order       Int
+  status      ContentStatus @default(PUBLISHED)
+
+  attempts  Attempt[]
+  liveRooms LiveRoom[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([worldId, order])
+}
+
+// Estatistica agregada por tecla (briefing secao 42/43: preferir agregado a
+// log bruto). Base do "mapa de teclas fracas" (secao 50, CA17).
+model KeystrokeStat {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  char     String
+  attempts Int    @default(0)
+  errors   Int    @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, char])
+}
+
+model Attempt {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  mode AttemptMode @default(PRACTICE)
+
+  startedAt  DateTime
+  finishedAt DateTime
+  durationMs Int
+
+  expectedChars  Int
+  typedChars     Int
+  correctChars   Int
+  incorrectChars Int
+  backspaces     Int
+
+  wpmRaw      Float
+  wpmNet      Float
+  accuracy    Float
+  consistency Float
+
+  formulaVersion String
+
+  createdAt DateTime @default(now())
+
+  @@index([studentId, exerciseId])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action   String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+}
+
+// --- Fase 3: Competir (docs/briefing.md secao 24-26, 45) ---
+// Sala ao vivo: professor/admin cria, gera codigo temporario, aluno entra e
+// compete numa corrida sincronizada pelo servidor (tempo/pontuacao oficiais
+// nao vem do cliente -- secao 25).
+
+enum LiveRoomStatus {
+  LOBBY
+  COUNTDOWN
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
+model LiveRoom {
+  id     String         @id @default(cuid())
+  // Codigo curto de entrada, unico apenas enquanto a sala nao termina
+  // (liberado depois -- secao 25 "codigo expira apos encerramento").
+  code   String         @unique
+  status LiveRoomStatus @default(LOBBY)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  hostUserId String
+  hostUser   User   @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  participants LiveRoomParticipant[]
+
+  createdAt DateTime @default(now())
+}
+
+// Resultado oficial de um aluno numa sala -- persistido ao final para
+// historico (secao 24, item 11), calculado a partir do Attempt validado
+// pelo mesmo pipeline de metricas usado no modo pratica.
+model LiveRoomParticipant {
+  id String @id @default(cuid())
+
+  roomId String
+  room   LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  joinedAt   DateTime  @default(now())
+  finishedAt DateTime?
+
+  wpmNet         Float?
+  accuracy       Float?
+  consistency    Float?
+  incorrectChars Int?
+  position       Int?
+
+  createdAt DateTime @default(now())
+
+  @@unique([roomId, studentId])
+}
+
+// --- Fase 4: Jogar (docs/briefing.md secao 15) ---
+
+enum GameType {
+  ORBITAL
+}
+
+// Pontuacao de uma partida de jogo solo. Diferente de Attempt (que mede um
+// exercicio de texto fixo), aqui a pontuacao vem de uma mecanica de jogo
+// (combo, multiplicador, palavras completadas) calculada no cliente e so
+// validada superficialmente no servidor -- sem sala ao vivo/ranking oficial
+// envolvido ainda, o mesmo nivel de confianca do modo pratica (secao 46).
+model GameScore {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  game      GameType
+
+  score          Int
+  wordsCompleted Int
+  accuracy       Float
+  durationMs     Int
+
+  createdAt DateTime @default(now())
+
+  @@index([studentId, game])
+}

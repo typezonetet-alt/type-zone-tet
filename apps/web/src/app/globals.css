@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/*
+  Design tokens do briefing T&T (docs/briefing.md, secao 37 "Design system").
+  Cores sao placeholder ate a identidade visual final da T&T ser confirmada
+  (secao 58, "Marca: Nome, logo, favicon e cores" e configuravel pelo admin) --
+  troque so os valores aqui, nunca hardcode cor em componente.
+*/
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #06b6d4;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #facc15;
+  --color-accent-foreground: #0f172a;
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+
+  --color-card: #ffffff;
+  --color-card-foreground: var(--foreground);
+  --color-border: #e2e8f0;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+
+  --radius-card: 16px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+
+  --color-card: var(--color-card);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-border: var(--color-border);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+
+  --radius-card: var(--radius-card);
+  --shadow-card: var(--shadow-card);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --color-card: #111827;
+    --color-card-foreground: var(--foreground);
+    --color-border: #1f2937;
+    --color-muted: #1e293b;
+    --color-muted-foreground: #94a3b8;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Feedback de erro no motor de digitacao (typing-session.tsx): pequeno tremor
+   no caractere atual quando a pessoa erra e precisa tentar de novo. */
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
+}
+
+/* Paralaxe do fundo estrelado do T&T Orbital (components/orbital/orbital-background.tsx). */
+@keyframes orbital-drift {
+  from { background-position: 0 0; }
+  to { background-position: 0 260px; }
+}
+
+/* Entrada de uma palavra nova no T&T Orbital (components/orbital/orbital-board.tsx).
+   So escala/opacidade: o posicionamento horizontal fica num elemento externo,
+   entao esta animacao nao pode mexer em translateX. */
+@keyframes orbital-spawn {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Feixe de tiro do dronezinho, some rapido apos acertar a letra. */
+@keyframes orbital-shot-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Explosao ao completar uma palavra ou impacto ao perder uma na base. */
+@keyframes orbital-burst-expand {
+  from { r: 1; opacity: 1; }
+  to { r: 8; opacity: 0; }
+}
+
+/* Anuncio de nivel novo: entra com escala, segura, e some no final. */
+@keyframes orbital-levelup {
+  0% { transform: scale(0.7); opacity: 0; }
+  12% { transform: scale(1.05); opacity: 1; }
+  20% { transform: scale(1); opacity: 1; }
+  75% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
