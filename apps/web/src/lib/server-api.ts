@@ -1,11 +1,18 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type {
+  AchievementView,
   AdminOverview,
   ClassDetail,
   ClassSummary,
+  CosmeticView,
   ExerciseDetail,
   ExerciseSummary,
+  LeaderboardEntry,
+  LeaderboardScope,
+  MissionView,
+  ProfileView,
+  SeasonView,
   TeacherSummary,
   WeakKey,
   WorldSummary,
@@ -68,5 +75,39 @@ export async function getServerAdminOverview(): Promise<AdminOverview | null> {
 
 export async function getServerTeachers(): Promise<TeacherSummary[]> {
   const { data } = await serverFetch<TeacherSummary[]>("/admin/teachers");
+  return data ?? [];
+}
+
+export async function getServerProfile(): Promise<ProfileView | null> {
+  const { data } = await serverFetch<ProfileView>("/gamification/profile");
+  return data;
+}
+
+export async function getServerMissions(): Promise<MissionView[]> {
+  const { data } = await serverFetch<MissionView[]>("/gamification/missions");
+  return data ?? [];
+}
+
+export async function getServerAchievements(): Promise<AchievementView[]> {
+  const { data } = await serverFetch<AchievementView[]>("/gamification/achievements");
+  return data ?? [];
+}
+
+export async function getServerCosmetics(): Promise<CosmeticView[]> {
+  const { data } = await serverFetch<CosmeticView[]>("/gamification/cosmetics");
+  return data ?? [];
+}
+
+export async function getServerSeason(): Promise<SeasonView | null> {
+  const { data } = await serverFetch<SeasonView>("/gamification/season");
+  return data;
+}
+
+export async function getServerLeaderboard(
+  scope: LeaderboardScope,
+): Promise<LeaderboardEntry[]> {
+  const { data } = await serverFetch<LeaderboardEntry[]>(
+    `/gamification/leaderboard?scope=${scope}`,
+  );
   return data ?? [];
 }

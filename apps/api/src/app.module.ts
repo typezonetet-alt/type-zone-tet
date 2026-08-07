@@ -15,6 +15,7 @@ import { ClassesModule } from './classes/classes.module';
 import { AdminModule } from './admin/admin.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { GamesModule } from './games/games.module';
+import { GamificationModule } from './gamification/gamification.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { GamesModule } from './games/games.module';
     AdminModule,
     RoomsModule,
     GamesModule,
+    GamificationModule,
   ],
   controllers: [AppController],
   providers: [

@@ -51,9 +51,14 @@ export default async function DashboardPage() {
 
           <div className="mt-6 flex items-center gap-3">
             {user.role === Role.STUDENT ? (
-              <Link href="/aprender" className={cn(buttonVariants({ variant: "primary" }))}>
-                Continuar treino
-              </Link>
+              <>
+                <Link href="/aprender" className={cn(buttonVariants({ variant: "primary" }))}>
+                  Continuar treino
+                </Link>
+                <Link href="/progresso" className={cn(buttonVariants({ variant: "ghost" }))}>
+                  Progresso
+                </Link>
+              </>
             ) : (
               <Link href="/gestao" className={cn(buttonVariants({ variant: "primary" }))}>
                 Ir para gestão

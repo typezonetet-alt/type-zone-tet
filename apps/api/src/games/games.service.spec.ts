@@ -1,6 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { GamesService } from './games.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 describe('GamesService', () => {
   let service: GamesService;
@@ -12,6 +13,10 @@ describe('GamesService', () => {
     },
   };
 
+  const gamificationMock = {
+    recordGameScore: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock.gameScore.findFirst.mockResolvedValue(null);
@@ -20,6 +25,7 @@ describe('GamesService', () => {
       providers: [
         GamesService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: GamificationService, useValue: gamificationMock },
       ],
     }).compile();
 

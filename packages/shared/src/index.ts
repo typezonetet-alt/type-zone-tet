@@ -4,3 +4,4 @@ export * from "./exercises";
 export * from "./classes";
 export * from "./rooms";
 export * from "./games";
+export * from "./gamification";

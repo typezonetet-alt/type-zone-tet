@@ -74,6 +74,9 @@ export default async function AprenderPage() {
           <Link href="/competir" className={cn(buttonVariants({ variant: "accent", size: "sm" }))}>
             Competir
           </Link>
+          <Link href="/progresso" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+            Progresso
+          </Link>
         </div>
       </div>
 

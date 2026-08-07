@@ -6,10 +6,14 @@ import type {
   SubmitGameScorePayload,
 } from '@tt-digita/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class GamesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gamification: GamificationService,
+  ) {}
 
   async submitOrbitalScore(
     studentId: string,
@@ -30,6 +34,13 @@ export class GamesService {
         accuracy: dto.accuracy,
         durationMs: dto.durationMs,
       },
+    });
+
+    await this.gamification.recordGameScore(studentId, {
+      wordsCompleted: dto.wordsCompleted,
+      accuracy: dto.accuracy,
+      durationMs: dto.durationMs,
+      isFirstGameEver: !previousBest,
     });
 
     return {

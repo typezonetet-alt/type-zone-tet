@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AttemptResult } from '@tt-digita/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StatsService } from '../stats/stats.service';
+import { GamificationService } from '../gamification/gamification.service';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import {
   assertPlausibleCounts,
@@ -14,6 +15,7 @@ export class AttemptsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
+    private readonly gamification: GamificationService,
   ) {}
 
   async submit(
@@ -59,6 +61,17 @@ export class AttemptsService {
     });
 
     await this.stats.recordCharStats(studentId, dto.charStats);
+    await this.gamification.recordExerciseAttempt(studentId, {
+      exerciseId: dto.exerciseId,
+      accuracy: metrics.accuracy,
+      wpmNet: metrics.wpmNet,
+      correctChars: dto.correctChars,
+      incorrectChars: dto.incorrectChars,
+      durationMs: dto.durationMs,
+      minAccuracy: exercise.minAccuracy,
+      targetWpm: exercise.targetWpm,
+      allowedKeys: exercise.allowedKeys,
+    });
 
     return {
       id: attempt.id,

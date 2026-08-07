@@ -21,6 +21,9 @@ describe('RoomsGateway', () => {
 
   const jwtMock = { verifyAsync: jest.fn() };
   const authServiceMock = { getAuthenticatedUser: jest.fn() };
+  const gamificationMock = {
+    recordRoomFinish: jest.fn().mockResolvedValue(undefined),
+  };
 
   const prismaMock = {
     student: { findUnique: jest.fn() },
@@ -89,6 +92,7 @@ describe('RoomsGateway', () => {
       jwtMock as never,
       authServiceMock as never,
       prismaMock as never,
+      gamificationMock as never,
     );
     toEmit = jest.fn();
     (gateway as unknown as { server: unknown }).server = {

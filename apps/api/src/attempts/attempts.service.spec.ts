@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AttemptsService } from './attempts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StatsService } from '../stats/stats.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 describe('AttemptsService', () => {
   let service: AttemptsService;
@@ -19,6 +20,10 @@ describe('AttemptsService', () => {
 
   const statsMock = {
     recordCharStats: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const gamificationMock = {
+    recordExerciseAttempt: jest.fn().mockResolvedValue(undefined),
   };
 
   const baseDto = {
@@ -46,6 +51,7 @@ describe('AttemptsService', () => {
         AttemptsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: StatsService, useValue: statsMock },
+        { provide: GamificationService, useValue: gamificationMock },
       ],
     }).compile();
 

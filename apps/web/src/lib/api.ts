@@ -1,10 +1,12 @@
 import type {
+  AchievementView,
   AdminOverview,
   AttemptResult,
   AttemptSubmission,
   AuthenticatedUser,
   ClassDetail,
   ClassSummary,
+  CosmeticView,
   CreateClassPayload,
   CreatedCredentials,
   CreateRoomPayload,
@@ -14,8 +16,13 @@ import type {
   ExerciseSummary,
   GameBest,
   GameScoreResult,
+  LeaderboardEntry,
+  LeaderboardScope,
+  MissionView,
+  ProfileView,
   RoomExerciseOption,
   RoomSummary,
+  SeasonView,
   StaffLoginPayload,
   StudentLoginPayload,
   SubmitGameScorePayload,
@@ -181,4 +188,40 @@ export function submitOrbitalScore(payload: SubmitGameScorePayload) {
 
 export function getOrbitalBest() {
   return request<GameBest>("/games/orbital/best");
+}
+
+export function getGamificationProfile() {
+  return request<ProfileView>("/gamification/profile");
+}
+
+export function getMissions() {
+  return request<MissionView[]>("/gamification/missions");
+}
+
+export function getAchievements() {
+  return request<AchievementView[]>("/gamification/achievements");
+}
+
+export function getCosmetics() {
+  return request<CosmeticView[]>("/gamification/cosmetics");
+}
+
+export function purchaseCosmetic(cosmeticId: string) {
+  return request<CosmeticView[]>(`/gamification/cosmetics/${cosmeticId}/purchase`, {
+    method: "POST",
+  });
+}
+
+export function equipCosmetic(cosmeticId: string) {
+  return request<CosmeticView[]>(`/gamification/cosmetics/${cosmeticId}/equip`, {
+    method: "POST",
+  });
+}
+
+export function getSeason() {
+  return request<SeasonView>("/gamification/season");
+}
+
+export function getLeaderboard(scope: LeaderboardScope = "geral") {
+  return request<LeaderboardEntry[]>(`/gamification/leaderboard?scope=${scope}`);
 }

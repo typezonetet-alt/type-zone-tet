@@ -19,6 +19,7 @@ import { AuthService, type JwtPayload } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SESSION_COOKIE } from '../auth/auth.constants';
 import { assertPlausibleCounts, computeMetrics } from '../attempts/metrics';
+import { GamificationService } from '../gamification/gamification.service';
 
 const COUNTDOWN_SECONDS = 5;
 
@@ -74,6 +75,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     private readonly jwt: JwtService,
     private readonly authService: AuthService,
     private readonly prisma: PrismaService,
+    private readonly gamification: GamificationService,
   ) {}
 
   // Autenticacao roda como middleware do Socket.IO, nao em handleConnection:
@@ -372,6 +374,18 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         wpmNet: participant.wpmNet ?? 0,
         accuracy: participant.accuracy ?? 0,
       })),
+    );
+
+    await Promise.all(
+      ranked.map((participant, index) =>
+        this.gamification.recordRoomFinish(participant.studentId, {
+          position: index + 1,
+          participantCount: ranked.length,
+          wpmNet: participant.wpmNet ?? 0,
+          accuracy: participant.accuracy ?? 0,
+          incorrectChars: participant.incorrectChars ?? 0,
+        }),
+      ),
     );
   }
 

@@ -230,6 +230,19 @@ async function main() {
     });
   }
 
+  // Fase 5 (Reter): garante uma temporada ativa -- o servico de gamificacao
+  // tambem cria sob demanda, mas seedar aqui deixa o estado inicial explicito.
+  const existingSeason = await prisma.season.findFirst({
+    orderBy: { index: "desc" },
+  });
+  if (!existingSeason) {
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await prisma.season.create({
+      data: { index: 1, startsAt, endsAt },
+    });
+  }
+
   console.log("Seed concluido.");
   console.log("Superadmin: superadmin@tt.local / Super#2026");
   console.log("Admin: admin@tt.local / Admin#2026");

@@ -26,6 +26,7 @@ describe('Exercises + Attempts (e2e)', () => {
       order: 1,
       minAccuracy: 0.85,
       targetWpm: null,
+      allowedKeys: ['f', 'j'],
       status: 'PUBLISHED',
     },
     {
@@ -37,6 +38,7 @@ describe('Exercises + Attempts (e2e)', () => {
       order: 2,
       minAccuracy: 0.85,
       targetWpm: null,
+      allowedKeys: ['a', 's', 'd', 'f'],
       status: 'PUBLISHED',
     },
   ];

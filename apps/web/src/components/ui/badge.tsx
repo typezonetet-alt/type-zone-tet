@@ -10,6 +10,7 @@ const badgeVariants = cva(
         primary: "bg-[var(--color-primary)]/10 text-[var(--color-primary)]",
         success: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
         error: "bg-[var(--color-error)]/10 text-[var(--color-error)]",
+        accent: "bg-[var(--color-accent)]/15 text-[var(--color-accent-foreground)]",
         muted: "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]",
       },
     },

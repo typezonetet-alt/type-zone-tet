@@ -56,6 +56,11 @@ model Student {
   keystrokeStats         KeystrokeStat[]
   liveRoomParticipations LiveRoomParticipant[]
   gameScores             GameScore[]
+  profile                StudentProfile?
+  cosmetics              StudentCosmetic[]
+  achievements           StudentAchievement[]
+  dailyActivities        DailyActivity[]
+  seasonScores           SeasonScore[]
 
   createdAt DateTime @default(now())
 }
@@ -310,4 +315,143 @@ model GameScore {
   createdAt DateTime @default(now())
 
   @@index([studentId, game])
+}
+
+// --- Fase 5: Reter (docs/briefing.md secao 26-29) ---
+// XP/nivel/moedas/sequencia sao vitalicios (StudentProfile). Pontos de liga
+// sao por temporada (SeasonScore), zerados/recalculados a cada nova Season --
+// secao 27: "usar pontos de temporada, separados do XP vitalicio".
+// Catalogos de missao/conquista/cosmetico sao estaticos no codigo (nao ha
+// tela de configuracao para superusuario nesta fase), so o progresso de cada
+// aluno e persistido aqui.
+
+enum League {
+  BRONZE
+  PRATA
+  OURO
+  PLATINA
+  DIAMANTE
+  MESTRE
+  LENDA
+}
+
+enum CosmeticType {
+  AVATAR_FRAME
+  THEME
+  TITLE
+}
+
+enum AchievementKey {
+  FIRST_LESSON
+  THOUSAND_WORDS
+  TEN_THOUSAND_WORDS
+  SEVEN_DAY_STREAK
+  FIRST_DIAMOND_MASTERY
+  FIRST_COMPETITION
+  PERFECT_ACCURACY
+  NEW_PERSONAL_RECORD
+}
+
+// Um por aluno. Contadores vitalicios (XP, nivel, moedas, sequencia, recorde).
+model StudentProfile {
+  studentId String  @id
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  xp                 Int       @default(0)
+  level              Int       @default(1)
+  coins              Int       @default(0)
+  totalCorrectWords  Int       @default(0)
+  bestWpmNet         Float     @default(0)
+  currentStreak      Int       @default(0)
+  longestStreak      Int       @default(0)
+  distinctActiveDays Int       @default(0)
+  // Data (meia-noite UTC) da ultima atividade valida, usada so pra calcular
+  // sequencia (dia seguinte = +1, mesmo dia = mantem, qualquer salto = reseta).
+  lastActiveDate     DateTime?
+
+  equippedFrameId String?
+  equippedThemeId String?
+  equippedTitleId String?
+
+  updatedAt DateTime @updatedAt
+}
+
+// Compra de um item do catalogo estatico de cosmeticos (id do catalogo, nao FK).
+model StudentCosmetic {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  cosmeticId String
+  type       CosmeticType
+
+  purchasedAt DateTime @default(now())
+
+  @@unique([studentId, cosmeticId])
+}
+
+model StudentAchievement {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  key       AchievementKey
+
+  unlockedAt DateTime @default(now())
+
+  @@unique([studentId, key])
+}
+
+// Contadores do dia (meia-noite UTC), base das missoes diarias e da
+// sequencia/anti-farm de XP (secao 27: "limitar ganho repetitivo").
+model DailyActivity {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime
+
+  exercisesCompleted   Int      @default(0)
+  secondsTrained       Int      @default(0)
+  accuracyGoalHit      Boolean  @default(false)
+  weakKeyPracticed     Boolean  @default(false)
+  roomJoined           Boolean  @default(false)
+  personalBestImproved Boolean  @default(false)
+  // Exercicios ja recompensados hoje (evita farmar XP repetindo o mesmo
+  // exercicio varias vezes no mesmo dia).
+  rewardedExerciseIds  String[] @default([])
+  claimedMissionKeys   String[] @default([])
+
+  @@unique([studentId, date])
+}
+
+model Season {
+  id       String    @id @default(cuid())
+  index    Int       @unique
+  startsAt DateTime
+  endsAt   DateTime
+  closedAt DateTime?
+
+  scores SeasonScore[]
+
+  createdAt DateTime @default(now())
+}
+
+model SeasonScore {
+  id String @id @default(cuid())
+
+  seasonId String
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  points    Int    @default(0)
+  league    League @default(BRONZE)
+  finalRank Int?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, studentId])
 }
