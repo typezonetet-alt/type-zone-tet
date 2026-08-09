@@ -260,21 +260,49 @@ export function xpProgress(xp: number): {
 }
 
 // "Ganhou XP por completar" so conta se passou na barra minima do exercicio
-// (o mesmo minAccuracy que ja gate o avanco na trilha).
-export function xpForExerciseCompletion(accuracy: number): number {
-  return Math.round(20 + 40 * Math.min(1, Math.max(0, accuracy)));
+// (o mesmo minAccuracy que ja gate o avanco na trilha). Peso por mundo
+// (anti-farm, ver docs do pedido de salas multi-rodada): sem isso, repetir
+// exercicios faceis do Mundo 1 pra sempre rendia o MESMO XP que avancar pra
+// mundos dificeis -- Mundo 1 = 1.0x, Mundo 12 = 1.88x, pra quase dobrar o
+// incentivo de progredir na trilha em vez de so repetir o que ja sabe.
+export function xpForExerciseCompletion(
+  accuracy: number,
+  worldOrder: number,
+): number {
+  const base = 20 + 40 * Math.min(1, Math.max(0, accuracy));
+  const worldMultiplier = 1 + 0.08 * (worldOrder - 1);
+  return Math.round(base * worldMultiplier);
 }
 
-export function xpForRoomFinish(
-  position: number,
-  participantCount: number,
-): number {
-  const base = 15;
-  if (participantCount <= 1) return base;
-  if (position === 1) return 40;
-  if (position === 2) return 25;
-  if (position === 3) return 15;
-  return base;
+// Jogos nao tem um "ja recompensei este" natural feito exercicio
+// (rewardedExerciseIds) -- o teto e por XP acumulado no dia, nao por jogo
+// especifico, senao dava pra rodar todos os 5 jogos em sequencia sem limite
+// real. ~3-4 exercicios medios, deliberadamente menor que o teto efetivo da
+// trilha (que tem dezenas de exercicios por dia).
+export const DAILY_GAME_XP_CAP = 150;
+
+// Sala de mais rodadas (Mundo inteiro) vale mais XP que uma sala rapida de
+// 1 rodada pro MESMO 1o lugar -- reflete o esforco real de completar mais
+// exercicios em competicao, nao so a colocacao isolada (secao 4 do plano de
+// salas multi-rodada: anti-farm tambem se aplica aqui, nao so em exercicio
+// solo/jogo solo).
+export function xpForRoomFinish(input: {
+  finalPosition: number;
+  participantCount: number;
+  roundCount: number;
+}): number {
+  const placementBase =
+    input.participantCount <= 1
+      ? 15
+      : input.finalPosition === 1
+        ? 40
+        : input.finalPosition === 2
+          ? 25
+          : input.finalPosition === 3
+            ? 15
+            : 15;
+  const roundMultiplier = Math.min(3, 1 + 0.15 * (input.roundCount - 1));
+  return Math.round(placementBase * roundMultiplier);
 }
 
 export function coinsForXp(xp: number): number {

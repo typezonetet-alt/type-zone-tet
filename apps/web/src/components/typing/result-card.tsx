@@ -30,15 +30,15 @@ export function ResultCard({ result, exercise, onRetry }: ResultCardProps) {
       </CardHeader>
 
       <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
-        <Metric label="WPM líquido" value={result.wpmNet} />
-        <Metric label="WPM bruto" value={result.wpmRaw} />
+        <Metric label="PPM líquido" value={result.wpmNet} />
+        <Metric label="PPM bruto" value={result.wpmRaw} />
         <Metric label="Precisão" value={`${accuracyPct}%`} />
         <Metric label="Consistência" value={`${Math.round(result.consistency)}%`} />
       </div>
 
       {result.previousBest ? (
         <p className="text-center text-sm text-[var(--color-muted-foreground)]">
-          Seu melhor anterior: {result.previousBest.wpmNet} WPM,{" "}
+          Seu melhor anterior: {result.previousBest.wpmNet} PPM,{" "}
           {Math.round(result.previousBest.accuracy * 100)}% de precisão.
         </p>
       ) : null}

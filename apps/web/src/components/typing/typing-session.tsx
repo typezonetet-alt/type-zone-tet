@@ -11,7 +11,7 @@ import { ResultCard } from "./result-card";
 
 export function TypingSession({ exercise }: { exercise: ExerciseDetail }) {
   const targetChars = useMemo(() => Array.from(exercise.content), [exercise.content]);
-  const [state, dispatch] = useTypingEngine(targetChars.length);
+  const [state, dispatch] = useTypingEngine(targetChars);
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,11 +61,10 @@ export function TypingSession({ exercise }: { exercise: ExerciseDetail }) {
       dispatch({
         type: "TYPE",
         char: event.key,
-        expected: targetChars[state.position],
         now: performance.now(),
       });
     },
-    [state.phase, state.position, targetChars, dispatch],
+    [state.phase, dispatch],
   );
 
   useGlobalKeydown(handleKeyDown, !result);

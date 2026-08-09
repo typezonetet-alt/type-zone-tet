@@ -55,6 +55,7 @@ model Student {
   attempts               Attempt[]
   keystrokeStats         KeystrokeStat[]
   liveRoomParticipations LiveRoomParticipant[]
+  liveRoomRoundResults   LiveRoomRoundResult[]
   gameScores             GameScore[]
   profile                StudentProfile?
   cosmetics              StudentCosmetic[]
@@ -134,6 +135,7 @@ model World {
   order Int    @unique
 
   exercises Exercise[]
+  liveRooms LiveRoom[]
 
   createdAt DateTime @default(now())
 }
@@ -151,13 +153,19 @@ model Exercise {
   // e a mesma pra todos.
   content     String
   allowedKeys String[]
-  minAccuracy Float         @default(0.9)
+  // "% definido pelo professor" pra avançar pro próximo exercício (ver
+  // meetsUnlockBar em exercises/mastery.ts) -- 0.75 é o padrão quando o
+  // professor não personaliza o valor pra este exercício.
+  minAccuracy Float         @default(0.75)
   targetWpm   Int?
+  // Quantas tentativas o sistema pede antes de considerar o exercicio
+  // dominado, mesmo que a primeira ja bata a precisao minima -- repeticao
+  // curta e domino gradual (briefing sec. 8 "Dominio" / referencia TypingClub).
+  minAttempts Int           @default(2)
   order       Int
   status      ContentStatus @default(PUBLISHED)
 
-  attempts  Attempt[]
-  liveRooms LiveRoom[]
+  attempts Attempt[]
 
   createdAt DateTime @default(now())
 
@@ -242,6 +250,14 @@ enum LiveRoomStatus {
   CANCELLED
 }
 
+// Sala baseada em Mundo inteiro (rodada por exercicio, na ordem da trilha) ou
+// em Jogo (rodada unica, todos jogam o mesmo GameType ao mesmo tempo) --
+// nunca as duas coisas na mesma sala.
+enum LiveRoomActivityType {
+  WORLD
+  GAME
+}
+
 model LiveRoom {
   id     String         @id @default(cuid())
   // Codigo curto de entrada, unico apenas enquanto a sala nao termina
@@ -249,8 +265,19 @@ model LiveRoom {
   code   String         @unique
   status LiveRoomStatus @default(LOBBY)
 
-  exerciseId String
-  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  activityType LiveRoomActivityType
+
+  worldId  String?
+  world    World?    @relation(fields: [worldId], references: [id], onDelete: Restrict)
+  gameType GameType?
+
+  // Ordenado; preenchido so quando activityType = WORLD (1 id de Exercise
+  // por rodada). Snapshot da ordem do mundo no momento da criacao da sala --
+  // nao e recalculado se o professor editar o mundo depois.
+  roundExerciseIds String[] @default([])
+  roundCount       Int      @default(1)
+  // 0 = sala ainda nao comecou; 1..roundCount durante RUNNING.
+  currentRound     Int      @default(0)
 
   hostUserId String
   hostUser   User   @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
@@ -258,14 +285,17 @@ model LiveRoom {
   startedAt  DateTime?
   finishedAt DateTime?
 
+  roundResults LiveRoomRoundResult[]
   participants LiveRoomParticipant[]
 
   createdAt DateTime @default(now())
+
+  @@index([worldId])
 }
 
-// Resultado oficial de um aluno numa sala -- persistido ao final para
-// historico (secao 24, item 11), calculado a partir do Attempt validado
-// pelo mesmo pipeline de metricas usado no modo pratica.
+// Agregado final de um aluno numa sala -- persistido ao final para historico
+// (secao 24, item 11). O resultado rodada-a-rodada mora em LiveRoomRoundResult;
+// aqui so fica a soma de pontos e a colocacao final.
 model LiveRoomParticipant {
   id String @id @default(cuid())
 
@@ -275,24 +305,60 @@ model LiveRoomParticipant {
   studentId String
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  joinedAt   DateTime  @default(now())
-  finishedAt DateTime?
-
-  wpmNet         Float?
-  accuracy       Float?
-  consistency    Float?
-  incorrectChars Int?
-  position       Int?
+  joinedAt    DateTime  @default(now())
+  finishedAt  DateTime?
+  totalPoints Int       @default(0)
+  position    Int?
 
   createdAt DateTime @default(now())
 
   @@unique([roomId, studentId])
 }
 
+// Resultado de um aluno numa rodada especifica -- calculado a partir do
+// Attempt validado pelo mesmo pipeline de metricas do modo pratica (rodada
+// WORLD) ou do placar do minigame (rodada GAME, nao comparavel entre tipos
+// de jogo diferentes -- serve so de desempate dentro da MESMA rodada).
+model LiveRoomRoundResult {
+  id String @id @default(cuid())
+
+  roomId String
+  room   LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  roundIndex Int // 1-based
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  wpmNet         Float?
+  accuracy       Float?
+  consistency    Float?
+  incorrectChars Int?
+
+  gameScore          Int?
+  gameWordsCompleted Int?
+
+  // Ja convertido pela regra de pontos-por-colocacao -- e isso que soma pro
+  // placar da sala (LiveRoomParticipant.totalPoints), nao a metrica bruta.
+  pointsAwarded Int
+  position      Int?
+  finishedAt    DateTime?
+
+  @@unique([roomId, roundIndex, studentId])
+}
+
 // --- Fase 4: Jogar (docs/briefing.md secao 15) ---
 
 enum GameType {
   ORBITAL
+  ROBO
+  CHUVA_PALAVRAS
+  // DEFESA saiu do arcade (mecanica repetia o ORBITAL) e foi substituido por
+  // FRUTA. O valor continua aqui de proposito: ja existem GameScore gravados
+  // como DEFESA, e remover o valor do enum apagaria historico de aluno.
+  DEFESA
+  FRUTA
+  RITMO
 }
 
 // Pontuacao de uma partida de jogo solo. Diferente de Attempt (que mede um
@@ -422,6 +488,10 @@ model DailyActivity {
   // exercicio varias vezes no mesmo dia).
   rewardedExerciseIds  String[] @default([])
   claimedMissionKeys   String[] @default([])
+  // Teto diario de XP vindo de jogos soltos (anti-farm -- diferente dos
+  // exercicios, jogos nao tem um "ja recompensei este" natural, entao o teto
+  // e por XP acumulado no dia, nao por jogo especifico).
+  gameXpEarnedToday    Int      @default(0)
 
   @@unique([studentId, date])
 }

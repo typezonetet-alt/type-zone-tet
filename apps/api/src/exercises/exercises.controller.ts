@@ -1,5 +1,6 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import type {
+  AdaptiveSessionItem,
   AuthenticatedUser,
   ExerciseDetail,
   ExerciseSummary,
@@ -11,6 +12,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExercisesService } from './exercises.service';
+import { AdaptiveSessionService } from './adaptive-session.service';
 
 @Controller('exercises')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -18,6 +20,7 @@ import { ExercisesService } from './exercises.service';
 export class ExercisesController {
   constructor(
     private readonly exercisesService: ExercisesService,
+    private readonly adaptiveSessionService: AdaptiveSessionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -27,6 +30,16 @@ export class ExercisesController {
   ): Promise<ExerciseSummary[]> {
     const studentId = await this.studentId(user);
     return this.exercisesService.listForStudent(studentId);
+  }
+
+  // Precisa vir antes de ':id' -- senao o Nest casaria "/exercises/session"
+  // com a rota parametrizada abaixo e trataria "session" como um id.
+  @Get('session')
+  async session(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AdaptiveSessionItem[]> {
+    const studentId = await this.studentId(user);
+    return this.adaptiveSessionService.buildSession(studentId);
   }
 
   @Get(':id')

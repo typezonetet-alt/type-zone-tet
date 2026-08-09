@@ -8,6 +8,7 @@ import * as argon2 from 'argon2';
 import { Role as PrismaRole, type Prisma } from '@prisma/client';
 import type {
   AuthenticatedUser,
+  BulkImportResult,
   ClassDetail,
   ClassSummary,
   CreateClassPayload,
@@ -179,6 +180,42 @@ export class ClassesService {
     return { code: finalCode, email: null, temporaryPassword };
   }
 
+  // Cadastro em lote (briefing secao 6): codigo sempre auto-gerado (nao aceita
+  // codigo manual em lote, evita ambiguidade de "qual nome vai com qual
+  // codigo" numa lista). Uma linha falhando (nome vazio, colisao rarissima de
+  // codigo) nao derruba as demais -- processa uma a uma e reporta o resumo.
+  async createStudentsBulk(
+    classId: string,
+    names: string[],
+  ): Promise<BulkImportResult> {
+    await this.assertClassExists(classId);
+
+    const result: BulkImportResult = { created: [], failed: [] };
+
+    for (const rawName of names) {
+      const name = rawName.trim();
+      if (!name) {
+        result.failed.push({ name: rawName, reason: 'Nome vazio.' });
+        continue;
+      }
+
+      try {
+        const credentials = await this.createStudent(classId, { name });
+        result.created.push({
+          name,
+          code: credentials.code!,
+          temporaryPassword: credentials.temporaryPassword,
+        });
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Erro desconhecido.';
+        result.failed.push({ name, reason });
+      }
+    }
+
+    return result;
+  }
+
   async addExistingMember(classId: string, code: string): Promise<void> {
     await this.assertClassExists(classId);
 
@@ -213,6 +250,23 @@ export class ClassesService {
     await this.prisma.classMember.delete({
       where: { studentId_classId: { studentId, classId } },
     });
+  }
+
+  // Usado pelo ReportsModule: mesma regra de acesso do getDetail (professor
+  // so ve a propria turma, admin/superadmin veem qualquer uma), mas exposto
+  // publicamente pra nao duplicar a checagem de papel em outro modulo.
+  async assertAccessToClass(
+    user: AuthenticatedUser,
+    classId: string,
+  ): Promise<void> {
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { teacherId: true },
+    });
+    if (!cls) {
+      throw new NotFoundException('Turma não encontrada.');
+    }
+    await this.assertCanAccess(user, cls.teacherId);
   }
 
   private buildStudentProgress(

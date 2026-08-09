@@ -5,3 +5,5 @@ export * from "./classes";
 export * from "./rooms";
 export * from "./games";
 export * from "./gamification";
+export * from "./reports";
+export * from "./analytics";

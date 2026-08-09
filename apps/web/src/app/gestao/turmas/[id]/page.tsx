@@ -51,9 +51,17 @@ export default async function ClassDetailPage({
         </Link>
         <div className="mt-1 flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">{classDetail.name}</h1>
-          <Badge variant={classDetail.status === "ACTIVE" ? "success" : "muted"}>
-            {classDetail.status}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/gestao/turmas/${classDetail.id}/relatorios`}
+              className="text-sm text-[var(--color-primary)] hover:underline"
+            >
+              Relatórios
+            </Link>
+            <Badge variant={classDetail.status === "ACTIVE" ? "success" : "muted"}>
+              {classDetail.status}
+            </Badge>
+          </div>
         </div>
         <p className="text-sm text-[var(--color-muted-foreground)]">
           {classDetail.teacherName ?? "Sem professor"}
@@ -85,7 +93,7 @@ export default async function ClassDetailPage({
               <th className="p-3 font-medium">Código</th>
               <th className="p-3 font-medium">Progresso</th>
               <th className="p-3 font-medium">Precisão média</th>
-              <th className="p-3 font-medium">WPM médio</th>
+              <th className="p-3 font-medium">PPM médio</th>
               <th className="p-3 font-medium">Última prática</th>
               {isAdmin ? <th className="p-3 font-medium">Ações</th> : null}
             </tr>

@@ -141,4 +141,80 @@ describe('Games (e2e)', () => {
       accuracy: 0.92,
     });
   });
+
+  describe.each(['robo', 'chuva', 'defesa', 'fruta', 'ritmo'])('%s routes', (slug) => {
+    it('blocks score submission without a session', async () => {
+      await request(app.getHttpServer())
+        .post(`/games/${slug}/scores`)
+        .send({
+          score: 100,
+          wordsCompleted: 5,
+          accuracy: 0.9,
+          durationMs: 30_000,
+        })
+        .expect(401);
+    });
+
+    it('submits a score and flags it as a new best', async () => {
+      prisma.gameScore.findFirst.mockResolvedValue(null);
+      prisma.gameScore.create.mockResolvedValue({
+        id: `${slug}-score-1`,
+        score: 300,
+        wordsCompleted: 12,
+        accuracy: 0.88,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post(`/games/${slug}/scores`)
+        .set('Cookie', sessionCookie)
+        .send({
+          score: 300,
+          wordsCompleted: 12,
+          accuracy: 0.88,
+          durationMs: 45_000,
+        })
+        .expect(201);
+
+      expect(res.body).toEqual({
+        id: `${slug}-score-1`,
+        score: 300,
+        wordsCompleted: 12,
+        accuracy: 0.88,
+        isNewBest: true,
+        previousBest: null,
+      });
+    });
+
+    it('rejects an implausible score payload', async () => {
+      await request(app.getHttpServer())
+        .post(`/games/${slug}/scores`)
+        .set('Cookie', sessionCookie)
+        .send({
+          score: -5,
+          wordsCompleted: 12,
+          accuracy: 0.88,
+          durationMs: 45_000,
+        })
+        .expect(400);
+    });
+
+    it('returns the personal best', async () => {
+      prisma.gameScore.findFirst.mockResolvedValue({
+        score: 700,
+        wordsCompleted: 30,
+        accuracy: 0.9,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/games/${slug}/best`)
+        .set('Cookie', sessionCookie)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        score: 700,
+        wordsCompleted: 30,
+        accuracy: 0.9,
+      });
+    });
+  });
 });

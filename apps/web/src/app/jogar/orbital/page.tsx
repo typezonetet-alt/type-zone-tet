@@ -3,7 +3,11 @@ import { Role } from "@tt-digita/shared";
 import { getServerUser } from "@/lib/session";
 import { OrbitalGame } from "./orbital-game";
 
-export default async function OrbitalPage() {
+export default async function OrbitalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ room?: string }>;
+}) {
   const user = await getServerUser();
   if (!user) {
     redirect("/login");
@@ -11,10 +15,11 @@ export default async function OrbitalPage() {
   if (user.role !== Role.STUDENT) {
     redirect("/gestao");
   }
+  const { room } = await searchParams;
 
   return (
     <main className="p-6">
-      <OrbitalGame />
+      <OrbitalGame roomCode={room ?? null} />
     </main>
   );
 }

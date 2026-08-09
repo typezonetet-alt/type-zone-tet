@@ -62,3 +62,18 @@ export interface CreatedCredentials {
   email: string | null;
   temporaryPassword: string;
 }
+
+export interface CreateStudentsBulkPayload {
+  names: string[];
+}
+
+export interface BulkCreatedStudent {
+  name: string;
+  code: string;
+  temporaryPassword: string;
+}
+
+export interface BulkImportResult {
+  created: BulkCreatedStudent[];
+  failed: { name: string; reason: string }[];
+}

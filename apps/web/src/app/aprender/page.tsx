@@ -1,56 +1,40 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ExerciseSummary } from "@tt-digita/shared";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Role, meetsMasteryBar, type ExerciseSummary } from "@tt-digita/shared";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { brandColorFor } from "@/lib/palette";
 import { getServerUser } from "@/lib/session";
-import { getServerExercises, getServerWeakKeys, getServerWorlds } from "@/lib/server-api";
-
-function ExerciseCard({ exercise }: { exercise: ExerciseSummary }) {
-  const content = (
-    <Card
-      className={exercise.unlocked ? "transition-shadow hover:shadow-lg" : "opacity-60"}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <CardTitle className="text-base">{exercise.title}</CardTitle>
-          <CardDescription>
-            Meta de precisão: {Math.round(exercise.minAccuracy * 100)}%
-            {exercise.targetWpm ? ` · ${exercise.targetWpm} WPM` : ""}
-          </CardDescription>
-        </div>
-        {exercise.bestAccuracy !== null ? (
-          <Badge variant={exercise.bestAccuracy >= exercise.minAccuracy ? "success" : "muted"}>
-            {Math.round(exercise.bestAccuracy * 100)}%
-          </Badge>
-        ) : exercise.unlocked ? (
-          <Badge variant="primary">Novo</Badge>
-        ) : (
-          <Badge variant="muted">Bloqueado</Badge>
-        )}
-      </div>
-    </Card>
-  );
-
-  return exercise.unlocked ? (
-    <Link href={`/aprender/${exercise.id}`}>{content}</Link>
-  ) : (
-    content
-  );
-}
+import {
+  getServerAdaptiveSession,
+  getServerExercises,
+  getServerProfile,
+  getServerSeason,
+  getServerWeakKeys,
+  getServerWorlds,
+} from "@/lib/server-api";
+import { TtMascot } from "@/components/mascot/tt-mascot";
+import { WorldPath } from "./world-path";
+import { AdaptiveSessionCard } from "./adaptive-session-card";
 
 export default async function AprenderPage() {
   const user = await getServerUser();
   if (!user) {
     redirect("/login");
   }
+  if (user.role !== Role.STUDENT) {
+    redirect("/gestao");
+  }
 
-  const [worlds, exercises, weakKeys] = await Promise.all([
+  const [worlds, exercises, weakKeys, profile, season, adaptiveSession] = await Promise.all([
     getServerWorlds(),
     getServerExercises(),
     getServerWeakKeys(),
+    getServerProfile(),
+    getServerSeason(),
+    getServerAdaptiveSession(),
   ]);
 
   const exercisesByWorld = new Map<string, ExerciseSummary[]>();
@@ -60,12 +44,42 @@ export default async function AprenderPage() {
     exercisesByWorld.set(exercise.worldId, list);
   }
 
+  // Pra explicar (não só mostrar) um nó bloqueado: o limiar que trava o
+  // exercício N é o `minAccuracy` do exercício N-1 na ordem GLOBAL da
+  // trilha (a cascata de desbloqueio atravessa fronteira de mundo -- ver
+  // exercises.service.ts). `exercises` já vem nessa ordem exata da API.
+  const unlockHintById = new Map<
+    string,
+    { minAccuracy: number; bestAccuracy: number | null } | null
+  >();
+  exercises.forEach((exercise, i) => {
+    const previous = i > 0 ? exercises[i - 1] : null;
+    unlockHintById.set(
+      exercise.id,
+      previous ? { minAccuracy: previous.minAccuracy, bestAccuracy: previous.bestAccuracy } : null,
+    );
+  });
+
+  function isCurrentLesson(exercise: ExerciseSummary): boolean {
+    return exercise.unlocked && !meetsMasteryBar(exercise.mastery);
+  }
+
+  // So o primeiro "no atual" da trilha inteira ganha o balao "Começar" --
+  // evita varios baloes flutuando se, por algum motivo, mais de um mundo
+  // tivesse uma licao destravada e nao concluida ao mesmo tempo.
+  const firstCurrentWorldId = worlds.find((world) =>
+    (exercisesByWorld.get(world.id) ?? []).some(isCurrentLesson),
+  )?.id;
+
   return (
     <main className="mx-auto max-w-2xl space-y-8 p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-[var(--color-primary)]">Aprender</p>
-          <h1 className="text-2xl font-semibold">Trilha de exercícios</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <TtMascot size={44} />
+          <div>
+            <p className="text-sm font-medium text-[var(--color-primary)]">Aprender</p>
+            <h1 className="text-2xl font-semibold">Trilha de exercícios</h1>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/jogar" className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
@@ -74,11 +88,35 @@ export default async function AprenderPage() {
           <Link href="/competir" className={cn(buttonVariants({ variant: "accent", size: "sm" }))}>
             Competir
           </Link>
-          <Link href="/progresso" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
-            Progresso
-          </Link>
         </div>
       </div>
+
+      {profile ? (
+        <Link href="/progresso" className="block">
+          <Card className="flex flex-wrap items-center justify-between gap-3 transition-shadow hover:shadow-lg">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant={profile.currentStreak > 0 ? "success" : "muted"}>
+                🔥 {profile.currentStreak} {profile.currentStreak === 1 ? "dia" : "dias"}
+              </Badge>
+              <Badge variant="accent">{profile.coins} moedas</Badge>
+              {season ? <Badge variant="primary">{season.league}</Badge> : null}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[var(--color-muted-foreground)]">Nível {profile.level}</p>
+              <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-[var(--color-muted)] sm:w-28">
+                <div
+                  className="h-full rounded-full bg-[var(--color-primary)]"
+                  style={{
+                    width: `${Math.min(100, Math.round((profile.xpIntoLevel / Math.max(1, profile.xpForNextLevel)) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </Card>
+        </Link>
+      ) : null}
+
+      <AdaptiveSessionCard items={adaptiveSession} />
 
       {weakKeys.length > 0 ? (
         <Card className="space-y-3">
@@ -94,32 +132,17 @@ export default async function AprenderPage() {
         </Card>
       ) : null}
 
-      <div className="space-y-10">
-        {worlds.map((world) => {
-          const worldExercises = exercisesByWorld.get(world.id) ?? [];
-          return (
-            <section key={world.id} className="space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">{world.title}</h2>
-                <p className="text-sm text-[var(--color-muted-foreground)]">{world.focus}</p>
-              </div>
-
-              {world.hasContent ? (
-                <ol className="space-y-3">
-                  {worldExercises.map((exercise) => (
-                    <li key={exercise.id}>
-                      <ExerciseCard exercise={exercise} />
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <Card className="opacity-60">
-                  <CardDescription>Em breve</CardDescription>
-                </Card>
-              )}
-            </section>
-          );
-        })}
+      <div className="space-y-12">
+        {worlds.map((world, index) => (
+          <WorldPath
+            key={world.id}
+            world={world}
+            exercises={exercisesByWorld.get(world.id) ?? []}
+            color={brandColorFor(index)}
+            hasCurrentBubble={world.id === firstCurrentWorldId}
+            unlockHintById={unlockHintById}
+          />
+        ))}
       </div>
     </main>
   );

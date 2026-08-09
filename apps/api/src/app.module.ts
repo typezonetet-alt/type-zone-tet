@@ -16,6 +16,8 @@ import { AdminModule } from './admin/admin.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { GamesModule } from './games/games.module';
 import { GamificationModule } from './gamification/gamification.module';
+import { ReportsModule } from './reports/reports.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { GamificationModule } from './gamification/gamification.module';
     RoomsModule,
     GamesModule,
     GamificationModule,
+    ReportsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

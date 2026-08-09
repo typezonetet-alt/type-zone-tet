@@ -10,6 +10,7 @@ import type {
   ExerciseType,
 } from '@tt-digita/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeMastery, meetsUnlockBar, type MasteryAttempt } from './mastery';
 
 // ExerciseType do Prisma e do pacote compartilhado tem os mesmos valores de
 // string por design; o Prisma so gera seu proprio tipo (mesma situacao de Role
@@ -28,14 +29,25 @@ export class ExercisesService {
       orderBy: [{ world: { order: 'asc' } }, { order: 'asc' }],
     });
 
-    const bestByExercise = await this.bestAccuracyByExercise(studentId);
+    const attemptsByExercise = await this.attemptsByExercise(studentId);
 
-    let previousPassed = true;
+    let previousUnlocked = true;
     return exercises.map((exercise) => {
-      const bestAccuracy = bestByExercise.get(exercise.id) ?? null;
-      const unlocked = previousPassed;
-      previousPassed =
-        bestAccuracy !== null && bestAccuracy >= exercise.minAccuracy;
+      const attempts = attemptsByExercise.get(exercise.id) ?? [];
+      const mastery = computeMastery(exercise, attempts);
+      const bestAccuracy =
+        attempts.length > 0
+          ? Math.max(...attempts.map((a) => a.accuracy))
+          : null;
+
+      const unlocked = previousUnlocked;
+      // Desbloquear o PRÓXIMO exercício não exige a sequência de minAttempts
+      // do domínio (mastery) -- só ter alcançado a precisão mínima uma vez.
+      // Ver o comentário de meetsUnlockBar em mastery.ts pra entender por quê
+      // (essa distinção corrige um bug real: terminar a última atividade de
+      // um mundo não desbloqueava o mundo seguinte até repetir a mesma
+      // proficiência várias vezes seguidas).
+      previousUnlocked = meetsUnlockBar(exercise.minAccuracy, bestAccuracy);
 
       return {
         id: exercise.id,
@@ -45,8 +57,10 @@ export class ExercisesService {
         order: exercise.order,
         minAccuracy: exercise.minAccuracy,
         targetWpm: exercise.targetWpm,
+        minAttempts: exercise.minAttempts,
         unlocked,
         bestAccuracy,
+        mastery,
       };
     });
   }
@@ -74,21 +88,33 @@ export class ExercisesService {
     return { ...summary, content: exercise.content };
   }
 
-  private async bestAccuracyByExercise(
+  // Retorna as tentativas de cada exercicio ordenadas da mais antiga pra mais
+  // recente -- o calculo de dominio olha a "janela" das ultimas tentativas,
+  // nao so a melhor de sempre (ver mastery.ts).
+  private async attemptsByExercise(
     studentId: string,
-  ): Promise<Map<string, number>> {
+  ): Promise<Map<string, MasteryAttempt[]>> {
     const attempts = await this.prisma.attempt.findMany({
       where: { studentId },
-      select: { exerciseId: true, accuracy: true },
+      orderBy: { finishedAt: 'asc' },
+      select: {
+        exerciseId: true,
+        accuracy: true,
+        wpmNet: true,
+        consistency: true,
+      },
     });
 
-    const best = new Map<string, number>();
+    const byExercise = new Map<string, MasteryAttempt[]>();
     for (const attempt of attempts) {
-      const current = best.get(attempt.exerciseId);
-      if (current === undefined || attempt.accuracy > current) {
-        best.set(attempt.exerciseId, attempt.accuracy);
-      }
+      const list = byExercise.get(attempt.exerciseId) ?? [];
+      list.push({
+        accuracy: attempt.accuracy,
+        wpmNet: attempt.wpmNet,
+        consistency: attempt.consistency,
+      });
+      byExercise.set(attempt.exerciseId, list);
     }
-    return best;
+    return byExercise;
   }
 }

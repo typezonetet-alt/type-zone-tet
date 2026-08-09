@@ -9,5 +9,6 @@ import { ClassesService } from './classes.service';
   imports: [AuthModule, AuditModule, StatsModule],
   controllers: [ClassesController],
   providers: [ClassesService],
+  exports: [ClassesService],
 })
 export class ClassesModule {}

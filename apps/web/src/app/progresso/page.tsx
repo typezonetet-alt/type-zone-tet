@@ -15,6 +15,7 @@ import {
   getServerSeason,
 } from "@/lib/server-api";
 import { CosmeticActions } from "./cosmetic-actions";
+import { PodiumRow } from "@/components/rooms/podium-view";
 
 const LEAGUE_LABEL: Record<League, string> = {
   [League.BRONZE]: "Bronze",
@@ -208,34 +209,56 @@ export default async function ProgressoPage({
             </Link>
           </div>
         </div>
-        <Card className="divide-y divide-[var(--color-border)] p-0">
-          {leaderboard.length === 0 ? (
-            <p className="p-4 text-sm text-[var(--color-muted-foreground)]">
+        {leaderboard.length === 0 ? (
+          <Card>
+            <p className="text-sm text-[var(--color-muted-foreground)]">
               Ainda não há pontuação registrada nesta temporada.
             </p>
-          ) : (
-            leaderboard.map((entry) => (
-              <div
-                key={entry.studentId}
-                className={cn(
-                  "flex items-center justify-between gap-3 p-4 text-sm",
-                  entry.isCurrentStudent ? "bg-[var(--color-muted)]" : "",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 text-center font-semibold text-[var(--color-muted-foreground)]">
-                    {entry.rank}
-                  </span>
-                  <span className="font-medium">{entry.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="muted">{LEAGUE_LABEL[entry.league]}</Badge>
-                  <span className="font-semibold">{entry.points} pts</span>
-                </div>
-              </div>
-            ))
-          )}
-        </Card>
+          </Card>
+        ) : (
+          <>
+            {/* Pódio: top-3 da temporada (soma XP de exercícios, salas e
+                jogos, com peso anti-farm -- ver xpForExerciseCompletion). */}
+            <Card className="space-y-2">
+              <ol className="space-y-2">
+                {leaderboard.slice(0, 3).map((entry) => (
+                  <PodiumRow
+                    key={entry.studentId}
+                    entry={{
+                      position: entry.rank,
+                      name: entry.name + (entry.isCurrentStudent ? " (você)" : ""),
+                      detail: `${entry.points} pts · ${LEAGUE_LABEL[entry.league]}`,
+                    }}
+                  />
+                ))}
+              </ol>
+            </Card>
+            {leaderboard.length > 3 ? (
+              <Card className="divide-y divide-[var(--color-border)] p-0">
+                {leaderboard.slice(3).map((entry) => (
+                  <div
+                    key={entry.studentId}
+                    className={cn(
+                      "flex items-center justify-between gap-3 p-4 text-sm",
+                      entry.isCurrentStudent ? "bg-[var(--color-muted)]" : "",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 text-center font-semibold text-[var(--color-muted-foreground)]">
+                        {entry.rank}
+                      </span>
+                      <span className="font-medium">{entry.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="muted">{LEAGUE_LABEL[entry.league]}</Badge>
+                      <span className="font-semibold">{entry.points} pts</span>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            ) : null}
+          </>
+        )}
       </section>
     </main>
   );

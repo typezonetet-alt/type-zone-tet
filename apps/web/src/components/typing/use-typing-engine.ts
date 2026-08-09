@@ -22,7 +22,7 @@ export interface TypingSessionState {
 }
 
 export type TypingSessionAction =
-  | { type: "TYPE"; char: string; expected: string; now: number }
+  | { type: "TYPE"; char: string; now: number }
   | { type: "BACKSPACE" }
   | { type: "RESET" };
 
@@ -41,7 +41,17 @@ function initialState(): TypingSessionState {
   };
 }
 
-function createReducer(targetLength: number) {
+// O caractere esperado e derivado AQUI DENTRO, a partir do state.position que
+// o proprio reducer recebe -- nunca de um valor calculado no componente e
+// passado junto na action. useReducer garante que cada dispatch roda contra o
+// estado mais recente, mas isso so vale se o reducer for a UNICA fonte de
+// "qual e a proxima tecla esperada"; se o chamador computasse isso ele mesmo
+// (via um closure de handleKeyDown), digitação muito rapida -- varios keydown
+// disparados antes do React re-renderizar entre eles -- podia fazer duas
+// teclas seguidas serem avaliadas contra o MESMO "esperado" desatualizado,
+// corrompendo a contagem de acerto/erro exatamente pros digitadores mais
+// rapidos (a persona que o produto menos pode atrapalhar).
+function createReducer(targetChars: string[]) {
   return function sessionReducer(
     state: TypingSessionState,
     action: TypingSessionAction,
@@ -61,8 +71,9 @@ function createReducer(targetLength: number) {
       }
 
       case "TYPE": {
+        const expected = targetChars[state.position];
         const startedAt = state.startedAt ?? action.now;
-        const correct = action.char === action.expected;
+        const correct = action.char === expected;
         const elapsedSeconds = Math.floor((action.now - startedAt) / 1000);
         const buckets = [...state.buckets];
         // Preenche segundos sem nenhuma tecla com 0 para o array nunca ficar
@@ -74,10 +85,10 @@ function createReducer(targetLength: number) {
         // ainda conta pra precisao final (nao vira "de graca").
         const position = correct ? state.position + 1 : state.position;
 
-        const prevCharStat = state.charStats[action.expected] ?? { attempts: 0, errors: 0 };
+        const prevCharStat = state.charStats[expected] ?? { attempts: 0, errors: 0 };
         const charStats = {
           ...state.charStats,
-          [action.expected]: {
+          [expected]: {
             attempts: prevCharStat.attempts + 1,
             errors: prevCharStat.errors + (correct ? 0 : 1),
           },
@@ -93,7 +104,7 @@ function createReducer(targetLength: number) {
           totalTyped: state.totalTyped + 1,
           totalCorrect: state.totalCorrect + (correct ? 1 : 0),
           totalIncorrect: state.totalIncorrect + (correct ? 0 : 1),
-          phase: position === targetLength ? "finished" : "typing",
+          phase: position === targetChars.length ? "finished" : "typing",
         };
       }
 
@@ -103,7 +114,7 @@ function createReducer(targetLength: number) {
   };
 }
 
-export function useTypingEngine(targetLength: number) {
-  const reducer = useMemo(() => createReducer(targetLength), [targetLength]);
+export function useTypingEngine(targetChars: string[]) {
+  const reducer = useMemo(() => createReducer(targetChars), [targetChars]);
   return useReducer(reducer, undefined, initialState);
 }

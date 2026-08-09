@@ -1,49 +1,62 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type {
+  RoomFinishPayload,
+  RoomParticipantView,
+  RoomProgressPayload,
+} from "@tt-digita/shared";
+import { LiveRoomActivityType } from "@tt-digita/shared";
 import { useRoomConnection } from "@/components/rooms/use-room-connection";
 import { useGlobalKeydown } from "@/lib/use-global-keydown";
 import { useTypingEngine } from "@/components/typing/use-typing-engine";
 import { TypingTrack } from "@/components/typing/typing-track";
 import { VirtualKeyboard } from "@/components/typing/virtual-keyboard";
-import { PodiumView } from "@/components/rooms/podium-view";
+import { PodiumView, PodiumRow, podiumFromParticipants } from "@/components/rooms/podium-view";
+import { RaceTrack } from "@/components/rooms/race-track";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { slugForGameType } from "@/components/games/game-identity";
 
-export function RoomRaceStudent({ code }: { code: string }) {
-  const { state, countdown, podium, error, finish } = useRoomConnection(code);
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const targetChars = useMemo(() => Array.from(state?.content ?? ""), [state?.content]);
-  const [session, dispatch] = useTypingEngine(targetChars.length);
+const PROGRESS_THROTTLE_MS = 200;
+
+// Motor de digitação de UMA rodada. Montado com key={roundIndex} pelo pai --
+// isso garante um useTypingEngine (e um submittedRef) totalmente novo a cada
+// rodada, em vez de tentar "resetar" o estado da rodada anterior na mão.
+// Um bug real apareceu na primeira versão sem esse key: o efeito que resetava
+// o motor e o efeito que submetia o resultado rodavam na MESMA leva de
+// efeitos quando a rodada mudava, e o de submissão via o `session` ainda
+// antigo (fase "finished" da rodada anterior) -- reenviava o resultado da
+// rodada passada como se fosse da nova, duplicando a pontuação.
+function RoundTyping({
+  content,
+  roundIndex,
+  roundCount,
+  participants,
+  studentName,
+  finishRound,
+  sendProgress,
+}: {
+  content: string;
+  roundIndex: number;
+  roundCount: number;
+  participants: RoomParticipantView[];
+  studentName: string;
+  finishRound: (payload: RoomFinishPayload) => void;
+  sendProgress: (payload: RoomProgressPayload) => void;
+}) {
+  const targetChars = useMemo(() => Array.from(content), [content]);
+  const [session, dispatch] = useTypingEngine(targetChars);
   const submittedRef = useRef(false);
-
-  useEffect(() => {
-    if (!countdown) return;
-    const tick = () => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((new Date(countdown.startsAt).getTime() - Date.now()) / 1000),
-      );
-      setSecondsLeft(remaining);
-    };
-    tick();
-    const interval = setInterval(tick, 200);
-    return () => clearInterval(interval);
-  }, [countdown]);
-
-  useEffect(() => {
-    if (state?.status === "RUNNING") {
-      submittedRef.current = false;
-      dispatch({ type: "RESET" });
-    }
-  }, [state?.status, dispatch]);
+  const lastProgressSentAt = useRef(0);
 
   useEffect(() => {
     if (session.phase !== "finished" || submittedRef.current) return;
     submittedRef.current = true;
 
     const durationMs = session.startedAt ? performance.now() - session.startedAt : 0;
-    finish({
+    finishRound({
       expectedChars: targetChars.length,
       typedChars: session.totalTyped,
       correctChars: session.totalCorrect,
@@ -57,7 +70,21 @@ export function RoomRaceStudent({ code }: { code: string }) {
         errors: stat.errors,
       })),
     });
-  }, [session, finish, targetChars.length]);
+  }, [session, finishRound, targetChars.length]);
+
+  // Barra de progresso ao vivo do T&T Turbo -- cosmetico, throttled pra nao
+  // inundar o socket a cada tecla (o resultado oficial so vem do finish acima).
+  useEffect(() => {
+    if (session.phase === "finished") return;
+    const now = performance.now();
+    if (now - lastProgressSentAt.current < PROGRESS_THROTTLE_MS) return;
+    lastProgressSentAt.current = now;
+    sendProgress({
+      typedChars: session.totalTyped,
+      correctChars: session.totalCorrect,
+      incorrectChars: session.totalIncorrect,
+    });
+  }, [session.totalTyped, session.totalCorrect, session.totalIncorrect, session.phase, sendProgress]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -75,14 +102,77 @@ export function RoomRaceStudent({ code }: { code: string }) {
       dispatch({
         type: "TYPE",
         char: event.key,
-        expected: targetChars[session.position],
         now: performance.now(),
       });
     },
-    [session.phase, session.position, targetChars, dispatch],
+    [session.phase, dispatch],
   );
 
-  useGlobalKeydown(handleKeyDown, state?.status === "RUNNING");
+  useGlobalKeydown(handleKeyDown, session.phase !== "finished");
+
+  if (session.phase === "finished") {
+    return (
+      <main className="mx-auto max-w-xl space-y-6 p-6">
+        <Card className="space-y-3 text-center">
+          <CardTitle className="text-base">Você terminou!</CardTitle>
+          <CardDescription>Aguardando os outros participantes...</CardDescription>
+        </Card>
+        <RaceTrack participants={participants} currentStudentName={studentName} />
+      </main>
+    );
+  }
+
+  const currentChar = targetChars[session.position] ?? null;
+
+  return (
+    <main className="mx-auto max-w-2xl space-y-6 p-6">
+      <p className="text-center text-sm font-medium text-[var(--color-primary)]">
+        Rodada {roundIndex} de {roundCount}
+      </p>
+      <RaceTrack participants={participants} currentStudentName={studentName} />
+      <TypingTrack
+        targetChars={targetChars}
+        position={session.position}
+        wrongStreak={session.wrongStreak}
+      />
+      <VirtualKeyboard targetChar={currentChar} />
+    </main>
+  );
+}
+
+export function RoomRaceStudent({
+  code,
+  studentName,
+}: {
+  code: string;
+  studentName: string;
+}) {
+  const router = useRouter();
+  const { state, countdown, roundResult, podium, error, finishRound, sendProgress } =
+    useRoomConnection(code);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!countdown) return;
+    const tick = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((new Date(countdown.startsAt).getTime() - Date.now()) / 1000),
+      );
+      setSecondsLeft(remaining);
+    };
+    tick();
+    const interval = setInterval(tick, 200);
+    return () => clearInterval(interval);
+  }, [countdown]);
+
+  // Sala de Jogo: a rodada não é digitação, o aluno joga o minigame normal
+  // (com a ponte de sala cuidando da pontuação) -- so redireciona uma vez.
+  useEffect(() => {
+    if (state?.activityType !== LiveRoomActivityType.GAME || !state.roundGameType) return;
+    const slug = slugForGameType(state.roundGameType);
+    if (slug) router.replace(`/jogar/${slug}?room=${code}`);
+  }, [state?.activityType, state?.roundGameType, code, router]);
 
   if (error) {
     return (
@@ -104,11 +194,17 @@ export function RoomRaceStudent({ code }: { code: string }) {
     );
   }
 
-  if (podium) {
+  // O evento PODIUM é efêmero -- se a sala já tiver fechado antes desta
+  // conexão existir (reconexão do aluno), reconstrói a partir das posições
+  // já persistidas em state.participants.
+  const effectivePodium =
+    podium ?? (state.status === "FINISHED" ? podiumFromParticipants(state.participants) : null);
+
+  if (effectivePodium) {
     return (
       <main className="mx-auto max-w-xl space-y-6 p-6">
-        <h1 className="text-2xl font-semibold">Corrida finalizada!</h1>
-        <PodiumView podium={podium} />
+        <h1 className="text-2xl font-semibold">Sala encerrada!</h1>
+        <PodiumView podium={effectivePodium} />
       </main>
     );
   }
@@ -128,8 +224,12 @@ export function RoomRaceStudent({ code }: { code: string }) {
     return (
       <main className="mx-auto max-w-xl space-y-6 p-6">
         <div>
-          <p className="text-sm font-medium text-[var(--color-primary)]">Sala {state.code}</p>
-          <h1 className="text-2xl font-semibold">{state.exerciseTitle}</h1>
+          <p className="text-sm font-medium text-[var(--color-primary)]">sala {state.code}</p>
+          <h1 className="text-2xl font-semibold">
+            {state.activityType === LiveRoomActivityType.WORLD
+              ? `${state.roundCount} ${state.roundCount === 1 ? "rodada" : "rodadas"}`
+              : "Modo Jogo"}
+          </h1>
         </div>
         <Card className="space-y-3">
           <CardTitle className="text-base">Aguardando o professor iniciar...</CardTitle>
@@ -151,42 +251,59 @@ export function RoomRaceStudent({ code }: { code: string }) {
     );
   }
 
-  if (session.phase === "finished") {
+  // Rodada fechou (todos terminaram) mas a sala não é a última rodada, ou o
+  // host ainda não avançou -- mostra o mini-placar e espera.
+  if (roundResult) {
     return (
       <main className="mx-auto max-w-xl space-y-6 p-6">
-        <Card className="space-y-3 text-center">
-          <CardTitle className="text-base">Você terminou!</CardTitle>
-          <CardDescription>Aguardando os outros participantes...</CardDescription>
+        <div>
+          <p className="text-sm font-medium text-[var(--color-primary)]">
+            Rodada {state.roundIndex} de {state.roundCount}
+          </p>
+          <h1 className="text-2xl font-semibold">Rodada concluída!</h1>
+        </div>
+        <Card className="space-y-3">
+          <CardTitle className="text-base">Placar da rodada</CardTitle>
+          <ol className="space-y-2">
+            {roundResult.map((entry) => (
+              <PodiumRow
+                key={entry.studentId}
+                entry={{
+                  position: entry.position,
+                  name: entry.name,
+                  detail: `${entry.roundPoints} pts · ${entry.totalPoints} total`,
+                }}
+              />
+            ))}
+          </ol>
         </Card>
-        <ul className="space-y-2">
-          {state.participants.map((participant) => (
-            <li
-              key={participant.studentId}
-              className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-border)] p-3 text-sm"
-            >
-              <span>{participant.name}</span>
-              {participant.finished ? (
-                <Badge variant="success">{participant.wpmNet?.toFixed(1)} WPM</Badge>
-              ) : (
-                <Badge variant="muted">Correndo...</Badge>
-              )}
-            </li>
-          ))}
-        </ul>
+        <CardDescription className="text-center">
+          Aguardando o professor avançar a sala...
+        </CardDescription>
       </main>
     );
   }
 
-  const currentChar = targetChars[session.position] ?? null;
+  if (state.activityType !== LiveRoomActivityType.WORLD || !state.content) {
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <Card>
+          <CardDescription>Abrindo o jogo...</CardDescription>
+        </Card>
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <TypingTrack
-        targetChars={targetChars}
-        position={session.position}
-        wrongStreak={session.wrongStreak}
-      />
-      <VirtualKeyboard targetChar={currentChar} />
-    </main>
+    <RoundTyping
+      key={state.roundIndex}
+      content={state.content}
+      roundIndex={state.roundIndex}
+      roundCount={state.roundCount}
+      participants={state.participants}
+      studentName={studentName}
+      finishRound={finishRound}
+      sendProgress={sendProgress}
+    />
   );
 }

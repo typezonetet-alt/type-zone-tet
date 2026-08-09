@@ -26,8 +26,10 @@ describe('Exercises + Attempts (e2e)', () => {
       order: 1,
       minAccuracy: 0.85,
       targetWpm: null,
+      minAttempts: 1,
       allowedKeys: ['f', 'j'],
       status: 'PUBLISHED',
+      world: { order: 1 },
     },
     {
       id: 'ex-2',
@@ -38,8 +40,10 @@ describe('Exercises + Attempts (e2e)', () => {
       order: 2,
       minAccuracy: 0.85,
       targetWpm: null,
+      minAttempts: 1,
       allowedKeys: ['a', 's', 'd', 'f'],
       status: 'PUBLISHED',
+      world: { order: 1 },
     },
   ];
 
@@ -189,5 +193,38 @@ describe('Exercises + Attempts (e2e)', () => {
 
   it('blocks access without a session', async () => {
     await request(app.getHttpServer()).get('/exercises').expect(401);
+  });
+
+  describe('GET /exercises/session (motor adaptativo)', () => {
+    it('blocks access without a session', async () => {
+      await request(app.getHttpServer()).get('/exercises/session').expect(401);
+    });
+
+    it('is matched by the dedicated route, not swallowed by GET /exercises/:id', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/exercises/session')
+        .set('Cookie', sessionCookie)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('offers the unlocked exercise plus a locked preview of the next one', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/exercises/session')
+        .set('Cookie', sessionCookie)
+        .expect(200);
+
+      expect(res.body).toContainEqual(
+        expect.objectContaining({ id: 'ex-1', block: 'atual' }),
+      );
+      expect(res.body).toContainEqual(
+        expect.objectContaining({
+          id: 'ex-2',
+          block: 'desafio',
+          unlocked: false,
+        }),
+      );
+    });
   });
 });

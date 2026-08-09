@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type {
   AuthenticatedUser,
+  BulkImportResult,
   ClassDetail,
   ClassSummary,
   CreatedCredentials,
@@ -22,6 +23,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { CreateStudentsBulkDto } from './dto/create-students-bulk.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 
 @Controller('classes')
@@ -62,6 +64,15 @@ export class ClassesController {
     @Body() dto: CreateStudentDto,
   ): Promise<CreatedCredentials> {
     return this.classesService.createStudent(id, dto);
+  }
+
+  @Post(':id/students/bulk')
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  createStudentsBulk(
+    @Param('id') id: string,
+    @Body() dto: CreateStudentsBulkDto,
+  ): Promise<BulkImportResult> {
+    return this.classesService.createStudentsBulk(id, dto.names);
   }
 
   @Post(':id/members')

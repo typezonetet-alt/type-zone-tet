@@ -17,5 +17,5 @@ export default async function CompetirCodePage({
     redirect("/gestao");
   }
 
-  return <RoomRaceStudent code={code.toUpperCase()} />;
+  return <RoomRaceStudent code={code.toUpperCase()} studentName={user.name} />;
 }

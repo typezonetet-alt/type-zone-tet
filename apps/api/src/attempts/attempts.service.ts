@@ -26,6 +26,7 @@ export class AttemptsService {
 
     const exercise = await this.prisma.exercise.findUnique({
       where: { id: dto.exerciseId },
+      include: { world: true },
     });
     if (!exercise) {
       throw new NotFoundException('Exercício não encontrado.');
@@ -71,6 +72,7 @@ export class AttemptsService {
       minAccuracy: exercise.minAccuracy,
       targetWpm: exercise.targetWpm,
       allowedKeys: exercise.allowedKeys,
+      worldOrder: exercise.world.order,
     });
 
     return {

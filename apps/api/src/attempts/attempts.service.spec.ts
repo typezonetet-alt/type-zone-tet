@@ -8,7 +8,7 @@ import { GamificationService } from '../gamification/gamification.service';
 describe('AttemptsService', () => {
   let service: AttemptsService;
 
-  const exercise = { id: 'ex-1', minAccuracy: 0.85 };
+  const exercise = { id: 'ex-1', minAccuracy: 0.85, world: { order: 1 } };
 
   const prismaMock = {
     exercise: { findUnique: jest.fn() },

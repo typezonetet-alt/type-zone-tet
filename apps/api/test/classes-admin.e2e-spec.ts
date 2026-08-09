@@ -192,6 +192,41 @@ describe('Classes + Admin (e2e)', () => {
     });
   });
 
+  describe('POST /classes/:id/students/bulk', () => {
+    it('imports every valid name in one request', async () => {
+      const cookie = await loginAs('ADMIN');
+      prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+      prisma.student.findUnique.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .post('/classes/class-1/students/bulk')
+        .set('Cookie', cookie)
+        .send({ names: ['Maria Silva', '  ', 'João Souza'] })
+        .expect(201);
+
+      expect(res.body.created).toHaveLength(2);
+      expect(res.body.failed).toEqual([{ name: '  ', reason: 'Nome vazio.' }]);
+    });
+
+    it('blocks a teacher from bulk-importing students', async () => {
+      const cookie = await loginAs('TEACHER');
+      await request(app.getHttpServer())
+        .post('/classes/class-1/students/bulk')
+        .set('Cookie', cookie)
+        .send({ names: ['Aluno'] })
+        .expect(403);
+    });
+
+    it('rejects an empty names array', async () => {
+      const cookie = await loginAs('ADMIN');
+      await request(app.getHttpServer())
+        .post('/classes/class-1/students/bulk')
+        .set('Cookie', cookie)
+        .send({ names: [] })
+        .expect(400);
+    });
+  });
+
   describe('admin overview + teachers', () => {
     it('blocks a teacher from the admin overview', async () => {
       const cookie = await loginAs('TEACHER');

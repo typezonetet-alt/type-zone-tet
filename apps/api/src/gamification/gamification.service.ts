@@ -29,6 +29,7 @@ import {
   ACHIEVEMENT_CATALOG,
   COINS_PER_MISSION,
   COSMETIC_CATALOG,
+  DAILY_GAME_XP_CAP,
   MISSION_CATALOG,
   XP_PER_MISSION,
   coinsForXp,
@@ -71,14 +72,20 @@ export interface ExerciseAttemptGamificationInput {
   minAccuracy: number;
   targetWpm: number | null;
   allowedKeys: string[];
+  // Peso anti-farm do XP -- ver xpForExerciseCompletion.
+  worldOrder: number;
 }
 
+// Agregado da sala inteira (pode ter varias rodadas, de exercicio ou de
+// jogo) -- nao carrega wpmNet/accuracy porque essas metricas moram por
+// rodada (LiveRoomRoundResult) e nao sao comparaveis entre rodada de jogo e
+// rodada de digitacao. bestWpmNet/PERFECT_ACCURACY/NEW_PERSONAL_RECORD
+// continuam sendo alimentados pela pratica solo (recordExerciseAttempt);
+// aqui so o XP de sala e a conquista de primeira competicao.
 export interface RoomFinishGamificationInput {
-  position: number;
+  finalPosition: number;
   participantCount: number;
-  wpmNet: number;
-  accuracy: number;
-  incorrectChars: number;
+  roundCount: number;
 }
 
 export interface GameScoreGamificationInput {
@@ -128,7 +135,7 @@ export class GamificationService {
       passed &&
       !ctx.activity.rewardedExerciseIds.includes(input.exerciseId)
     ) {
-      const xp = xpForExerciseCompletion(input.accuracy);
+      const xp = xpForExerciseCompletion(input.accuracy, input.worldOrder);
       this.addXp(ctx, xp);
       ctx.activity.rewardedExerciseIds = [
         ...ctx.activity.rewardedExerciseIds,
@@ -171,22 +178,11 @@ export class GamificationService {
     this.registerStreak(ctx);
     ctx.activity.roomJoined = true;
 
-    const previousBestWpm = ctx.profile.bestWpmNet;
-    let newRecord = false;
-    if (input.wpmNet > previousBestWpm) {
-      ctx.profile.bestWpmNet = input.wpmNet;
-      if (previousBestWpm > 0) newRecord = true;
-    }
-
-    this.addXp(ctx, xpForRoomFinish(input.position, input.participantCount));
+    this.addXp(ctx, xpForRoomFinish(input));
     this.evaluateMissions(ctx);
     await this.persist(ctx);
 
     await this.unlock(studentId, AchievementKey.FIRST_COMPETITION);
-    if (input.accuracy >= 1)
-      await this.unlock(studentId, AchievementKey.PERFECT_ACCURACY);
-    if (newRecord)
-      await this.unlock(studentId, AchievementKey.NEW_PERSONAL_RECORD);
   }
 
   async recordGameScore(
@@ -197,9 +193,18 @@ export class GamificationService {
     this.registerStreak(ctx);
     ctx.activity.secondsTrained += Math.round(input.durationMs / 1000);
 
-    const xp =
+    // Teto diario de XP de jogo (anti-farm): sem isso, jogar o mesmo jogo
+    // facil o dia inteiro rendia XP ilimitado, ao contrario de exercicios
+    // (que ja tem o teto natural de rewardedExerciseIds por exercicio).
+    const rawXp =
       Math.min(80, 10 + input.wordsCompleted) +
       (input.isFirstGameEver ? 20 : 0);
+    const remainingCap = Math.max(
+      0,
+      DAILY_GAME_XP_CAP - ctx.activity.gameXpEarnedToday,
+    );
+    const xp = Math.min(rawXp, remainingCap);
+    ctx.activity.gameXpEarnedToday += xp;
     this.addXp(ctx, xp);
     this.evaluateMissions(ctx);
     await this.persist(ctx);
@@ -351,6 +356,17 @@ export class GamificationService {
     });
 
     return this.getCosmeticsView(studentId);
+  }
+
+  // Leitura simples pro ReportsModule montar o ranking de uma turma especifica
+  // -- nao cria temporada (isso so acontece no fluxo do aluno, via
+  // getOrCreateActiveSeason) e retorna null se nenhuma existir ainda.
+  async getActiveSeasonId(): Promise<string | null> {
+    const season = await this.prisma.season.findFirst({
+      where: { closedAt: null },
+      orderBy: { index: 'desc' },
+    });
+    return season?.id ?? null;
   }
 
   async getSeasonView(studentId: string): Promise<SeasonView> {
@@ -526,6 +542,7 @@ export class GamificationService {
           personalBestImproved: ctx.activity.personalBestImproved,
           rewardedExerciseIds: ctx.activity.rewardedExerciseIds,
           claimedMissionKeys: ctx.activity.claimedMissionKeys,
+          gameXpEarnedToday: ctx.activity.gameXpEarnedToday,
         },
       }),
       this.prisma.seasonScore.update({

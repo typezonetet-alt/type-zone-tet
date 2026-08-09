@@ -24,6 +24,7 @@ describe('AdminService', () => {
     },
     attempt: { deleteMany: jest.fn().mockResolvedValue(undefined) },
     keystrokeStat: { deleteMany: jest.fn().mockResolvedValue(undefined) },
+    auditLog: { findMany: jest.fn().mockResolvedValue([]) },
   };
 
   const prismaMock = {
@@ -119,6 +120,57 @@ describe('AdminService', () => {
       prismaMock.student.findUnique.mockResolvedValue(null);
       await expect(service.resetStudentProgress('missing')).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('listAuditLog', () => {
+    it('maps rows and applies a default limit', async () => {
+      prismaMock.auditLog.findMany.mockResolvedValue([
+        {
+          id: 'log-1',
+          userId: 'user-1',
+          action: 'STUDENT_CREATED',
+          metadata: { classId: 'class-1' },
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      ]);
+
+      const rows = await service.listAuditLog({});
+
+      expect(rows).toEqual([
+        {
+          id: 'log-1',
+          userId: 'user-1',
+          action: 'STUDENT_CREATED',
+          metadata: { classId: 'class-1' },
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+      expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 200 }),
+      );
+    });
+
+    it('forwards userId/action/date filters to the query', async () => {
+      await service.listAuditLog({
+        userId: 'user-1',
+        action: 'STUDENT_CREATED',
+        from: '2026-01-01T00:00:00Z',
+        to: '2026-01-31T00:00:00Z',
+      });
+
+      expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 'user-1',
+            action: 'STUDENT_CREATED',
+            createdAt: {
+              gte: new Date('2026-01-01T00:00:00Z'),
+              lte: new Date('2026-01-31T00:00:00Z'),
+            },
+          }),
+        }),
       );
     });
   });

@@ -116,3 +116,246 @@ body {
   75% { transform: scale(1); opacity: 1; }
   100% { transform: scale(1); opacity: 0; }
 }
+
+/* Respiracao do "no" atual na trilha (components/aprender/world-path.tsx),
+   guia visual discreto pra indicar qual licao continuar. */
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.35); }
+  50% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Arcade (/jogar): dioramas animados dos gabinetes. Todos são aplicados via
+   `motion-safe:`, então quem pede menos movimento vê a cena parada.
+   --------------------------------------------------------------------------- */
+
+/* Palavra/ameaça caindo em direção à base -- a mecânica de Orbital, Chuva e Defesa. */
+@keyframes arcade-descend {
+  0% { transform: translateY(-12px); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(62px); opacity: 0; }
+}
+
+@keyframes arcade-twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.9; }
+}
+
+/* Tiro da nave subindo: aparece rápido e some. */
+@keyframes arcade-beam {
+  0% { opacity: 0; transform: scaleY(0.1); transform-origin: bottom; }
+  18% { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
+  60% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Cenário passando por trás do robô (ele corre no lugar, o mundo anda). */
+@keyframes arcade-slide-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-108px); }
+}
+
+@keyframes arcade-hop {
+  0%, 62%, 100% { transform: translateY(0); }
+  78% { transform: translateY(-9px); }
+}
+
+@keyframes arcade-rain {
+  from { transform: translateY(0); opacity: 0.6; }
+  to { transform: translateY(72px); opacity: 0; }
+}
+
+/* Escudo "aguentando" o impacto das ondas. */
+@keyframes arcade-guard {
+  0%, 40%, 100% { transform: translateY(0); }
+  48% { transform: translateY(2px) scale(0.97); }
+}
+
+/* Vida da base baixando e sendo recuperada -- conta a história do jogo inteiro. */
+@keyframes arcade-health {
+  0% { transform: scaleX(1); }
+  45% { transform: scaleX(0.35); }
+  60% { transform: scaleX(0.35); }
+  100% { transform: scaleX(1); }
+}
+
+@keyframes arcade-ripple {
+  0% { transform: scale(0.5); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes arcade-thump {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.22); }
+}
+
+@keyframes arcade-bar {
+  0%, 100% { transform: scaleY(0.5); }
+  12% { transform: scaleY(1.4); }
+}
+
+/* Arremesso em parábola do diorama da Salada: sobe, desacelera, cai. */
+@keyframes arcade-toss {
+  0% { transform: translateY(4px) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  48% { transform: translateY(-25px) rotate(150deg); }
+  86% { opacity: 1; }
+  100% { transform: translateY(6px) rotate(320deg); opacity: 0; }
+}
+
+/* Passada do corte no diorama. */
+@keyframes arcade-swipe {
+  0%, 55% { opacity: 0; stroke-dasharray: 0 60; }
+  62% { opacity: 0.9; stroke-dasharray: 60 0; }
+  80%, 100% { opacity: 0; stroke-dasharray: 60 0; }
+}
+
+/* Salada T&T: risco do corte passando pela fruta. */
+@keyframes salada-slash {
+  0% { opacity: 0; stroke-dasharray: 0 30; }
+  30% { opacity: 1; stroke-dasharray: 30 0; }
+  100% { opacity: 0; stroke-dasharray: 30 0; }
+}
+
+/* Salada T&T: a fruta cortada ao meio -- cada metade (clip-path já corta a
+   imagem em components/salada/salada-board.tsx) voa pro seu lado e desaparece. */
+@keyframes salada-half-left {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-16px, 16px) rotate(-75deg); opacity: 0; }
+}
+@keyframes salada-half-right {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(16px, 16px) rotate(75deg); opacity: 0; }
+}
+
+/* Salada T&T: o traço da lâmina cruzando o ponto de impacto -- aparece rápido
+   e brilhante bem antes das metades da fruta se separarem, pra dar o gesto
+   de "corte" que faltava (só metades voando não lia como um corte). */
+@keyframes salada-slash-line {
+  0% { opacity: 0; transform: scaleX(0.15); }
+  20% { opacity: 1; transform: scaleX(1.2); }
+  40% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+/* Respingo de suco: cada gota usa suas próprias --dx/--dy (definidas inline
+   por gota em salada-board.tsx) pra voar numa direção diferente. */
+@keyframes salada-juice-splat {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx, 10px), var(--dy, 10px)) scale(0.25); opacity: 0; }
+}
+
+/* Entrada escalonada dos gabinetes ao abrir o arcade. */
+@keyframes arcade-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* T&T Robo: flash eletrico do obstaculo "zap" (components/robo/robo-board.tsx). */
+@keyframes robo-zap {
+  0%, 100% { filter: none; }
+  30% { filter: brightness(1.8) drop-shadow(0 0 6px #fde047); }
+  60% { filter: brightness(1.2) drop-shadow(0 0 3px #fde047); }
+}
+
+/* Desvio rápido pelo obstáculo "zap" -- um lurch pra frente somado ao brilho
+   elétrico (diferente do "pulo" e do "agachar": aqui o robô atravessa rápido). */
+@keyframes robo-zap-dash {
+  0% { transform: translateX(0); filter: none; }
+  30% { transform: translateX(6px); filter: brightness(1.9) drop-shadow(0 0 6px #fde047); }
+  60% { transform: translateX(2px); filter: brightness(1.2) drop-shadow(0 0 3px #fde047); }
+  100% { transform: translateX(0); filter: none; }
+}
+
+/* Corrida em pé quieto -- roda sempre que o robô está "andando" e nenhuma
+   ação/tropeço está sobrepondo, pra nunca parecer estático parado no lugar. */
+@keyframes robo-run-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+/* Ciclo de passada de uma perna/braço (components/robo/robo-character.tsx) --
+   cada perna usa este MESMO keyframe com animation-delay defasado (metade do
+   período) pra alternar, em vez de duplicar o keyframe pra cada lado. */
+@keyframes robo-leg-swing {
+  0%, 100% { transform: rotate(24deg); }
+  50% { transform: rotate(-24deg); }
+}
+
+/* Pular por cima do obstáculo "jump" -- um arco de verdade (sobe e desce),
+   não só um degrau pra cima. */
+@keyframes robo-jump-arc {
+  0% { transform: translateY(0) scale(1, 1); }
+  35% { transform: translateY(-24px) scale(1.06, 0.94); }
+  70% { transform: translateY(-6px) scale(0.97, 1.04); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+/* Agachar por baixo do obstáculo "door". */
+@keyframes robo-duck {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  45% { transform: scaleY(0.62) translateY(7px); }
+}
+
+/* Tropeço ao errar a tecla ou perder o prazo -- ligado ao obstáculo que
+   "bateu" no robô (components/robo/robo-board.tsx computa a posição). */
+@keyframes robo-stumble-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-6px) rotate(-7deg); }
+  60% { transform: translateX(5px) rotate(5deg); }
+  85% { transform: translateX(-2px) rotate(-2deg); }
+}
+
+/* Poeira nos pés -- puff que nasce e some, reforça "chão passando debaixo". */
+@keyframes robo-dust-puff {
+  0% { transform: scale(0.4) translateY(0); opacity: 0.75; }
+  100% { transform: scale(1.7) translateY(-4px); opacity: 0; }
+}
+
+/* Faixas do chão passando por baixo do robô -- a pista "andando" de verdade,
+   independente do obstáculo (que tem seu próprio ritmo, ligado ao prazo). */
+@keyframes robo-ground-scroll {
+  from { background-position-x: 0; }
+  to { background-position-x: -48px; }
+}
+
+/* Nuvens/colinas de fundo, bem mais lentas que o chão -- paralaxe simples. */
+@keyframes robo-parallax-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-60px); }
+}
+
+/* Estouro de impacto quando o obstáculo alcança o robô (prazo estourou). */
+@keyframes robo-impact-burst {
+  0% { transform: scale(0.3); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   Modo Ritmo (/jogar/ritmo): a palavra desliza até a zona de acerto em
+   cadência com a batida -- ver components/ritmo/ritmo-board.tsx.
+   --------------------------------------------------------------------------- */
+
+/* Pulso da marca de batida -- o "tique" visual, sincronizado com o clique
+   sonoro (mesma virada de wordAppearedAtMs em use-ritmo-audio.ts). */
+@keyframes ritmo-beat-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  30% { transform: scale(1.6); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+
+/* Selo de julgamento aparecendo na zona de acerto -- pop rápido, sem
+   permanecer tempo demais (a próxima palavra já está a caminho). */
+@keyframes ritmo-judgement-pop {
+  0% { transform: scale(0.4) translateY(4px); opacity: 0; }
+  30% { transform: scale(1.15) translateY(0); opacity: 1; }
+  70% { transform: scale(1) translateY(0); opacity: 1; }
+  100% { transform: scale(1) translateY(-10px); opacity: 0; }
+}
+
+/* Palavra perdida: passa da zona de acerto e desmancha, em vez de só sumir. */
+@keyframes ritmo-miss-drift {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(-24px); opacity: 0; }
+}

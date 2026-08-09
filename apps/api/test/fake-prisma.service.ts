@@ -15,6 +15,13 @@ export function fakePrismaService() {
     },
     auditLog: {
       create: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    liveRoom: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
     },
     exercise: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -29,6 +36,7 @@ export function fakePrismaService() {
     },
     world: {
       findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
     },
     keystrokeStat: {
       upsert: jest.fn().mockResolvedValue(undefined),
@@ -58,6 +66,18 @@ export function fakePrismaService() {
     gameScore: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    liveRoomParticipant: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      upsert: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue(undefined),
+    },
+    liveRoomRoundResult: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue(undefined),
     },
     studentProfile: {
       // Valores default "zerados" -- suficiente pra AttemptsService/GamesService/
@@ -91,9 +111,11 @@ export function fakePrismaService() {
         personalBestImproved: false,
         rewardedExerciseIds: [],
         claimedMissionKeys: [],
+        gameXpEarnedToday: 0,
       }),
       update: jest.fn(),
       findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     studentAchievement: {
       create: jest.fn().mockResolvedValue(undefined),

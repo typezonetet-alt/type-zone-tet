@@ -89,6 +89,7 @@ function buildPrismaStub() {
               personalBestImproved: false,
               rewardedExerciseIds: [],
               claimedMissionKeys: [],
+              gameXpEarnedToday: 0,
             });
           }
           return Promise.resolve({ ...activities.get(key) });
@@ -323,6 +324,7 @@ describe('GamificationService', () => {
     minAccuracy: 0.9,
     targetWpm: null,
     allowedKeys: ['f', 'j'],
+    worldOrder: 1,
   };
 
   it('awards XP/coins on the first pass of an exercise but not again the same day (anti-farm)', async () => {
@@ -346,6 +348,56 @@ describe('GamificationService', () => {
     const afterThird = await service.getProfileView('student-1');
     expect(afterThird.xp).toBe(afterSecond.xp);
     expect(afterThird.coins).toBe(afterSecond.coins);
+  });
+
+  it('pays more XP for the same accuracy in a more advanced world (anti-farm: avançar vale mais que repetir o fácil)', async () => {
+    await service.recordExerciseAttempt('student-1', {
+      ...baseExerciseInput,
+      exerciseId: 'ex-world-1',
+      worldOrder: 1,
+    });
+    const afterWorld1 = await service.getProfileView('student-1');
+
+    await service.recordExerciseAttempt('student-2', {
+      ...baseExerciseInput,
+      exerciseId: 'ex-world-12',
+      worldOrder: 12,
+    });
+    const afterWorld12 = await service.getProfileView('student-2');
+
+    // Mesma precisao (accuracy: 1, herdado de baseExerciseInput), mundos
+    // diferentes -- Mundo 12 tem que pagar bem mais (quase o dobro, ver
+    // xpForExerciseCompletion) pro MESMO esforco de digitar.
+    expect(afterWorld12.xp).toBeGreaterThan(afterWorld1.xp);
+  });
+
+  it('caps daily XP from games (anti-farm: jogar o mesmo jogo fácil o dia todo não rende XP ilimitado)', async () => {
+    const gameInput = {
+      wordsCompleted: 50, // vai bater no teto de 80 por chamada, sobra pouco espaco pro cap diario
+      accuracy: 1,
+      durationMs: 60_000,
+      isFirstGameEver: false,
+    };
+
+    let xpBefore = (await service.getProfileView('student-1')).xp;
+    let totalGained = 0;
+    // Chama varias vezes no mesmo dia -- eventualmente o ganho por chamada
+    // cai a zero, mesmo que o placar em si (score bruto, fora do escopo
+    // deste teste) continue subindo normalmente partida a partida.
+    for (let i = 0; i < 5; i++) {
+      await service.recordGameScore('student-1', gameInput);
+      const xpAfter = (await service.getProfileView('student-1')).xp;
+      totalGained += xpAfter - xpBefore;
+      xpBefore = xpAfter;
+    }
+
+    expect(totalGained).toBeLessThanOrEqual(150);
+
+    // Mais uma chamada -- o teto ja bateu, XP para de crescer.
+    const xpAtCap = (await service.getProfileView('student-1')).xp;
+    await service.recordGameScore('student-1', gameInput);
+    const xpAfterCap = (await service.getProfileView('student-1')).xp;
+    expect(xpAfterCap).toBe(xpAtCap);
   });
 
   it('unlocks FIRST_LESSON idempotently (second unlock attempt does not throw)', async () => {

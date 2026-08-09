@@ -9,9 +9,15 @@ import { ApiError, getOrbitalBest, submitOrbitalScore } from "@/lib/api";
 import { useGlobalKeydown } from "@/lib/use-global-keydown";
 import { useOrbitalGame, wordsRequiredForLevel } from "@/components/orbital/use-orbital-game";
 import { OrbitalBoard } from "@/components/orbital/orbital-board";
+import { GameTitleScreen } from "@/components/games/game-title-screen";
+import { GameScreenHeader } from "@/components/games/game-screen-header";
+import { useRoomGameBridge } from "@/components/rooms/use-room-game-bridge";
+import { RoomGameGate } from "@/components/rooms/room-game-gate";
 
-export function OrbitalGame() {
-  const { state, start, reset, handleKey, releaseTarget } = useOrbitalGame();
+export function OrbitalGame({ roomCode = null }: { roomCode?: string | null }) {
+  const { state, start, reset, handleKey, releaseTarget, activateBomb } = useOrbitalGame();
+  const { inRoom, roomState, countdown, roomPodium, roomError, submitGameRound, readyToPlay } =
+    useRoomGameBridge(roomCode);
   const [best, setBest] = useState<GameBest | null>(null);
   const [reducedEffects, setReducedEffects] = useState(false);
   const [result, setResult] = useState<GameScoreResult | null>(null);
@@ -25,18 +31,25 @@ export function OrbitalGame() {
       .catch(() => undefined);
   }, []);
 
+  // Sala de jogo: todos começam juntos quando o host manda "iniciar" -- sem
+  // tela de título manual aqui.
+  useEffect(() => {
+    if (inRoom && readyToPlay && state.status === "ready") start();
+  }, [inRoom, readyToPlay, state.status, start]);
+
   useEffect(() => {
     if (state.status !== "gameover" || submittedRef.current) return;
     submittedRef.current = true;
 
     const totalRelevant = state.totalCorrect + state.totalIncorrect;
     const accuracy = totalRelevant > 0 ? state.totalCorrect / totalRelevant : 1;
+    const durationMs = Math.max(1, Math.round(state.elapsedMs));
 
     submitOrbitalScore({
       score: state.score,
       wordsCompleted: state.wordsCompleted,
       accuracy,
-      durationMs: Math.max(1, Math.round(state.elapsedMs)),
+      durationMs,
     })
       .then((res) => {
         setResult(res);
@@ -49,7 +62,11 @@ export function OrbitalGame() {
       .catch((err: unknown) => {
         setError(err instanceof ApiError ? err.message : "Não foi possível salvar a pontuação.");
       });
-  }, [state.status, state.score, state.wordsCompleted, state.totalCorrect, state.totalIncorrect, state.elapsedMs]);
+
+    if (inRoom) {
+      submitGameRound({ score: state.score, wordsCompleted: state.wordsCompleted, accuracy, durationMs });
+    }
+  }, [state.status, state.score, state.wordsCompleted, state.totalCorrect, state.totalIncorrect, state.elapsedMs, inRoom, submitGameRound]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -60,11 +77,18 @@ export function OrbitalGame() {
         releaseTarget();
         return;
       }
+      // Espaço nunca é a primeira letra de uma palavra do banco -- fica livre
+      // pra acionar a bomba de emergência sem conflitar com a digitação.
+      if (event.key === " ") {
+        event.preventDefault();
+        activateBomb();
+        return;
+      }
       if (event.key.length !== 1) return;
       event.preventDefault();
       handleKey(event.key);
     },
-    [handleKey, releaseTarget],
+    [handleKey, releaseTarget, activateBomb],
   );
 
   useGlobalKeydown(handleKeyDown, state.status === "playing");
@@ -76,14 +100,10 @@ export function OrbitalGame() {
     submittedRef.current = false;
   }
 
-  return (
+  const gameContent = (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-[var(--color-primary)]">Jogar</p>
-          <h1 className="text-2xl font-semibold">T&T Orbital</h1>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-[var(--color-muted-foreground)]">
+      <GameScreenHeader slug="orbital">
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={reducedEffects}
@@ -91,10 +111,10 @@ export function OrbitalGame() {
           />
           Efeitos reduzidos
         </label>
-      </div>
+      </GameScreenHeader>
 
       {state.status === "playing" ? (
-        <div className="grid grid-cols-5 gap-3 text-center">
+        <div className="grid grid-cols-3 gap-3 text-center sm:grid-cols-6">
           <Card>
             <CardDescription>Nível</CardDescription>
             <p className="text-xl font-semibold">{state.level}</p>
@@ -118,23 +138,24 @@ export function OrbitalGame() {
             <CardDescription>Vidas</CardDescription>
             <p className="text-xl font-semibold">{"♥".repeat(state.lives) || "—"}</p>
           </Card>
+          <Card className={state.bombCharges > 0 ? "ring-2 ring-[var(--color-accent)]" : ""}>
+            <CardDescription>Bomba</CardDescription>
+            <p className="text-xl font-semibold">{"💣".repeat(state.bombCharges) || "—"}</p>
+          </Card>
         </div>
       ) : null}
 
-      {state.status === "ready" ? (
-        <Card className="space-y-4 text-center">
-          <CardTitle>Pronto para decolar?</CardTitle>
-          <CardDescription>
-            Digite a primeira letra de uma palavra para mirar nela, depois complete antes que
-            alcance a base. Errar não troca de alvo — use <kbd className="rounded border border-[var(--color-border)] px-1 font-mono text-xs">Esc</kbd> para soltar a palavra e mirar outra.
-          </CardDescription>
-          {best?.score !== null && best?.score !== undefined ? (
-            <p className="text-sm text-[var(--color-muted-foreground)]">
-              Seu recorde: {best.score} pontos
-            </p>
-          ) : null}
-          <Button onClick={start}>Jogar</Button>
-        </Card>
+      {state.status === "ready" && !inRoom ? (
+        <GameTitleScreen
+          slug="orbital"
+          best={best}
+          onPlay={start}
+          howTo={[
+            { text: "Digite a 1ª letra pra mirar" },
+            { key: "Esc", text: "solta o alvo" },
+            { key: "Espaço", text: "bomba de emergência" },
+          ]}
+        />
       ) : null}
 
       {state.status === "playing" ? (
@@ -151,7 +172,9 @@ export function OrbitalGame() {
           <p className="text-center text-sm text-[var(--color-muted-foreground)]">
             {state.focusedWordId !== null
               ? "Esc solta a palavra atual para mirar outra."
-              : "Digite a primeira letra de uma palavra para mirar nela."}
+              : state.bombCharges > 0
+                ? "Digite a primeira letra de uma palavra, ou aperte Espaço pra usar a bomba."
+                : "Digite a primeira letra de uma palavra para mirar nela."}
           </p>
         </>
       ) : null}
@@ -174,4 +197,14 @@ export function OrbitalGame() {
       ) : null}
     </div>
   );
+
+  if (inRoom) {
+    return (
+      <RoomGameGate roomState={roomState} countdown={countdown} roomPodium={roomPodium} roomError={roomError}>
+        {gameContent}
+      </RoomGameGate>
+    );
+  }
+
+  return gameContent;
 }

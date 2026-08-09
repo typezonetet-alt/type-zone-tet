@@ -15,12 +15,13 @@ export class GamesService {
     private readonly gamification: GamificationService,
   ) {}
 
-  async submitOrbitalScore(
+  private async submitScore(
     studentId: string,
+    game: PrismaGameType,
     dto: SubmitGameScorePayload,
   ): Promise<GameScoreResult> {
     const previousBest = await this.prisma.gameScore.findFirst({
-      where: { studentId, game: PrismaGameType.ORBITAL },
+      where: { studentId, game },
       orderBy: { score: 'desc' },
       select: { score: true },
     });
@@ -28,7 +29,7 @@ export class GamesService {
     const created = await this.prisma.gameScore.create({
       data: {
         studentId,
-        game: PrismaGameType.ORBITAL,
+        game,
         score: dto.score,
         wordsCompleted: dto.wordsCompleted,
         accuracy: dto.accuracy,
@@ -53,9 +54,12 @@ export class GamesService {
     };
   }
 
-  async getOrbitalBest(studentId: string): Promise<GameBest> {
+  private async getBest(
+    studentId: string,
+    game: PrismaGameType,
+  ): Promise<GameBest> {
     const best = await this.prisma.gameScore.findFirst({
-      where: { studentId, game: PrismaGameType.ORBITAL },
+      where: { studentId, game },
       orderBy: { score: 'desc' },
     });
 
@@ -64,5 +68,53 @@ export class GamesService {
       wordsCompleted: best?.wordsCompleted ?? null,
       accuracy: best?.accuracy ?? null,
     };
+  }
+
+  submitOrbitalScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.ORBITAL, dto);
+  }
+
+  getOrbitalBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.ORBITAL);
+  }
+
+  submitRoboScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.ROBO, dto);
+  }
+
+  getRoboBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.ROBO);
+  }
+
+  submitChuvaScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.CHUVA_PALAVRAS, dto);
+  }
+
+  getChuvaBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.CHUVA_PALAVRAS);
+  }
+
+  submitDefesaScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.DEFESA, dto);
+  }
+
+  getDefesaBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.DEFESA);
+  }
+
+  submitFrutaScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.FRUTA, dto);
+  }
+
+  getFrutaBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.FRUTA);
+  }
+
+  submitRitmoScore(studentId: string, dto: SubmitGameScorePayload) {
+    return this.submitScore(studentId, PrismaGameType.RITMO, dto);
+  }
+
+  getRitmoBest(studentId: string) {
+    return this.getBest(studentId, PrismaGameType.RITMO);
   }
 }

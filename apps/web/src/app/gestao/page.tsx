@@ -39,9 +39,27 @@ export default async function GestaoPage() {
             {isAdmin ? "Painel do administrador" : "Minhas turmas"}
           </h1>
         </div>
-        <Link href="/gestao/salas" className={cn(buttonVariants({ variant: "accent", size: "sm" }))}>
-          Criar sala ao vivo
-        </Link>
+        <div className="flex items-center gap-3">
+          {isAdmin ? (
+            <Link
+              href="/gestao/analytics"
+              className="text-sm text-[var(--color-primary)] hover:underline"
+            >
+              Analytics
+            </Link>
+          ) : null}
+          {user.role === Role.SUPERADMIN ? (
+            <Link
+              href="/gestao/auditoria"
+              className="text-sm text-[var(--color-primary)] hover:underline"
+            >
+              Auditoria
+            </Link>
+          ) : null}
+          <Link href="/gestao/salas" className={cn(buttonVariants({ variant: "accent", size: "sm" }))}>
+            Criar sala ao vivo
+          </Link>
+        </div>
       </div>
 
       {overview ? (

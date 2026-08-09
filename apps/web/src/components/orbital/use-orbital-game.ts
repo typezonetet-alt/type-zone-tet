@@ -54,6 +54,12 @@ export interface OrbitalState {
   nextWordId: number;
   effects: GameEffect[];
   nextEffectId: number;
+  // Bomba de emergencia (ref. ZType: "EMP bombs" pra quando a tela fica
+  // sobrecarregada). Ganha por desempenho (subir de nivel), nunca comprada --
+  // limpa a tela sem dar pontos nem quebrar o combo, e um botao de panico, nao
+  // uma ferramenta de pontuacao.
+  bombCharges: number;
+  bombsUsed: number;
 }
 
 type OrbitalAction =
@@ -61,10 +67,12 @@ type OrbitalAction =
   | { type: "TICK"; deltaMs: number }
   | { type: "KEY"; key: string }
   | { type: "RELEASE_TARGET" }
+  | { type: "USE_BOMB" }
   | { type: "RESET" };
 
 const MAX_LIVES = 3;
 const MAX_MULTIPLIER = 3;
+export const MAX_BOMBS = 2;
 export const EFFECT_LIFETIME_MS = 380;
 export const LEVEL_UP_BANNER_MS = 2200;
 
@@ -104,6 +112,8 @@ function initialState(): OrbitalState {
     nextWordId: 0,
     effects: [],
     nextEffectId: 0,
+    bombCharges: 0,
+    bombsUsed: 0,
   };
 }
 
@@ -190,6 +200,7 @@ function completeWord(
   const wordsInLevel = state.wordsInLevel + 1;
   const levelUp = wordsInLevel >= wordsRequiredForLevel(state.level);
   const level = levelUp ? state.level + 1 : state.level;
+  const bombCharges = levelUp ? Math.min(MAX_BOMBS, state.bombCharges + 1) : state.bombCharges;
 
   return {
     ...state,
@@ -200,6 +211,7 @@ function completeWord(
     level,
     wordsInLevel: levelUp ? 0 : wordsInLevel,
     levelUpAtMs: levelUp ? state.elapsedMs : state.levelUpAtMs,
+    bombCharges,
     wordsCompleted: state.wordsCompleted + 1,
     focusedWordId: null,
     totalCorrect,
@@ -217,6 +229,32 @@ function reducer(state: OrbitalState, action: OrbitalAction): OrbitalState {
     case "START":
       if (state.status !== "ready") return state;
       return { ...state, status: "playing" };
+
+    // Bomba de emergencia: limpa a tela sem pontuar e sem quebrar o combo --
+    // e uma valvula de escape pra quando a tela ficou sobrecarregada, nao uma
+    // ferramenta pra otimizar pontuacao (por isso nao da pontos pelas palavras
+    // limpas e preserva o combo/multiplicador atual).
+    case "USE_BOMB": {
+      if (state.status !== "playing" || state.bombCharges <= 0 || state.words.length === 0) {
+        return state;
+      }
+      let effects = state.effects;
+      let nextEffectId = state.nextEffectId;
+      for (const word of state.words) {
+        const added = addEffect(effects, nextEffectId, "burst", visualCenterX(word), word.progress * 92, state.elapsedMs);
+        effects = added.effects;
+        nextEffectId = added.nextEffectId;
+      }
+      return {
+        ...state,
+        words: [],
+        focusedWordId: null,
+        bombCharges: state.bombCharges - 1,
+        bombsUsed: state.bombsUsed + 1,
+        effects,
+        nextEffectId,
+      };
+    }
 
     // Solta o alvo atual de proposito (Esc), pra poder mirar outra palavra --
     // util quando uma outra esta quase alcancando a base. A palavra largada
@@ -432,6 +470,7 @@ export function useOrbitalGame() {
   const reset = useCallback(() => dispatch({ type: "RESET" }), []);
   const handleKey = useCallback((key: string) => dispatch({ type: "KEY", key }), []);
   const releaseTarget = useCallback(() => dispatch({ type: "RELEASE_TARGET" }), []);
+  const activateBomb = useCallback(() => dispatch({ type: "USE_BOMB" }), []);
 
-  return { state, start, reset, handleKey, releaseTarget };
+  return { state, start, reset, handleKey, releaseTarget, activateBomb };
 }

@@ -4,6 +4,7 @@ import type {
   AttemptResult,
   AttemptSubmission,
   AuthenticatedUser,
+  BulkImportResult,
   ClassDetail,
   ClassSummary,
   CosmeticView,
@@ -11,6 +12,7 @@ import type {
   CreatedCredentials,
   CreateRoomPayload,
   CreateStudentPayload,
+  CreateStudentsBulkPayload,
   CreateTeacherPayload,
   ExerciseDetail,
   ExerciseSummary,
@@ -20,8 +22,9 @@ import type {
   LeaderboardScope,
   MissionView,
   ProfileView,
-  RoomExerciseOption,
+  RoomGameOption,
   RoomSummary,
+  RoomWorldOption,
   SeasonView,
   StaffLoginPayload,
   StudentLoginPayload,
@@ -130,6 +133,14 @@ export function createStudentInClass(classId: string, payload: CreateStudentPayl
   });
 }
 
+export function createStudentsBulk(classId: string, names: string[]) {
+  const payload: CreateStudentsBulkPayload = { names };
+  return request<BulkImportResult>(`/classes/${classId}/students/bulk`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function addExistingStudentToClass(classId: string, code: string) {
   return request<{ ok: true }>(`/classes/${classId}/members`, {
     method: "POST",
@@ -164,8 +175,12 @@ export function resetStudentProgress(studentId: string) {
   });
 }
 
-export function listRoomExercises() {
-  return request<RoomExerciseOption[]>("/rooms/exercises");
+export function listRoomWorlds() {
+  return request<RoomWorldOption[]>("/rooms/worlds");
+}
+
+export function listRoomGames() {
+  return request<RoomGameOption[]>("/rooms/games");
 }
 
 export function createRoom(payload: CreateRoomPayload) {
@@ -179,15 +194,65 @@ export function getRoom(id: string) {
   return request<RoomSummary>(`/rooms/${id}`);
 }
 
-export function submitOrbitalScore(payload: SubmitGameScorePayload) {
-  return request<GameScoreResult>("/games/orbital/scores", {
+type GameSlug = "orbital" | "robo" | "chuva" | "defesa" | "fruta" | "ritmo";
+
+function submitGameScore(game: GameSlug, payload: SubmitGameScorePayload) {
+  return request<GameScoreResult>(`/games/${game}/scores`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
+function getGameBest(game: GameSlug) {
+  return request<GameBest>(`/games/${game}/best`);
+}
+
+export function submitOrbitalScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("orbital", payload);
+}
+
 export function getOrbitalBest() {
-  return request<GameBest>("/games/orbital/best");
+  return getGameBest("orbital");
+}
+
+export function submitRoboScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("robo", payload);
+}
+
+export function getRoboBest() {
+  return getGameBest("robo");
+}
+
+export function submitChuvaScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("chuva", payload);
+}
+
+export function getChuvaBest() {
+  return getGameBest("chuva");
+}
+
+export function submitDefesaScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("defesa", payload);
+}
+
+export function getDefesaBest() {
+  return getGameBest("defesa");
+}
+
+export function submitFrutaScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("fruta", payload);
+}
+
+export function getFrutaBest() {
+  return getGameBest("fruta");
+}
+
+export function submitRitmoScore(payload: SubmitGameScorePayload) {
+  return submitGameScore("ritmo", payload);
+}
+
+export function getRitmoBest() {
+  return getGameBest("ritmo");
 }
 
 export function getGamificationProfile() {
