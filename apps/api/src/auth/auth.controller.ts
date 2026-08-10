@@ -50,7 +50,15 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) res: Response): { ok: true } {
-    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    // Precisa dos mesmos atributos do cookie original (ver setSessionCookie),
+    // senao o navegador nao casa o cookie cross-site e nao o apaga.
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie(SESSION_COOKIE, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/',
+    });
     return { ok: true };
   }
 
@@ -62,10 +70,16 @@ export class AuthController {
 
   private async setSessionCookie(res: Response, user: AuthenticatedUser) {
     const token = await this.authService.issueToken(user);
+    // Em producao o front (Vercel) e a API (Railway) ficam em dominios
+    // diferentes -- cross-site. O navegador so envia o cookie de sessao
+    // nessas requisicoes se ele for SameSite=None; Secure. Em
+    // desenvolvimento (mesmo host, http) mantemos Lax, ja que None exige
+    // Secure e o localhost roda sem HTTPS.
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie(SESSION_COOKIE, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: SESSION_MAX_AGE_MS,
       path: '/',
     });

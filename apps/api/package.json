@@ -9,7 +9,8 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "scripts": {
-    "build": "nest build",
+    "prebuild": "pnpm --filter @tt-digita/shared build",
+    "build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
