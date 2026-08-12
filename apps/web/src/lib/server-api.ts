@@ -27,13 +27,13 @@ import type {
   WeakKey,
   WorldSummary,
 } from "@tt-digita/shared";
-import { API_URL } from "./api";
+import { API_ORIGIN } from "./api";
 
 async function serverFetch<T>(path: string): Promise<{ status: number; data: T | null }> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_ORIGIN}${path}`, {
     headers: { cookie: cookieHeader },
     cache: "no-store",
   });

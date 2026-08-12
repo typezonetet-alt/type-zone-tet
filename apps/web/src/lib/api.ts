@@ -34,7 +34,15 @@ import type {
   WorldSummary,
 } from "@tt-digita/shared";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+// Origem absoluta da API. Serve para o que nao passa pelo proxy do Next: as
+// chamadas feitas no servidor (fetch exige URL absoluta) e o socket.io, que o
+// rewrite nao encaminha por ser WebSocket.
+export const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+
+// Caminho usado pelo navegador. E relativo de proposito: o rewrite em
+// next.config.ts encaminha /api para a API, mantendo tudo no mesmo dominio para
+// o cookie de sessao ser first-party (ver o comentario la).
+export const API_URL = "/api";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {

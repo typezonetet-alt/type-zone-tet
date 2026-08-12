@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { AuthenticatedUser } from "@tt-digita/shared";
-import { API_URL } from "./api";
+import { API_ORIGIN } from "./api";
 
 export async function getServerUser(): Promise<AuthenticatedUser | null> {
   const cookieStore = await cookies();
@@ -9,7 +9,7 @@ export async function getServerUser(): Promise<AuthenticatedUser | null> {
 
   if (!cookieHeader) return null;
 
-  const res = await fetch(`${API_URL}/auth/me`, {
+  const res = await fetch(`${API_ORIGIN}/auth/me`, {
     headers: { cookie: cookieHeader },
     cache: "no-store",
   });
