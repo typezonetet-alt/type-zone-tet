@@ -34,39 +34,42 @@ exige um redeploy — nao basta salvar a variavel.
 
 ## Railway (API)
 
-O `railway.json` na raiz do repositorio ja define builder, build command, start
-command e healthcheck. A Railway le esse arquivo sozinha, entao **nao e preciso
-digitar comando nenhum no dashboard** — so configurar as variaveis e gerar o
-dominio.
+O build usa o `Dockerfile` da raiz, e o `railway.json` aponta o builder para
+ele. A Railway le os dois arquivos sozinha, entao **nao e preciso digitar
+comando nenhum no dashboard** — so configurar as variaveis e gerar o dominio.
 
-| Campo | Valor (ja vem do railway.json) |
+| Campo | Valor |
 | --- | --- |
 | Root Directory | vazio (raiz do repo) |
-| Build Command | `pnpm install --frozen-lockfile --prod=false && pnpm --filter @tt-digita/api build` |
-| Start Command | `pnpm --filter @tt-digita/api start:prod` |
+| Builder | `DOCKERFILE` (definido no railway.json) |
+| Build / Start Command | deixar em branco — vem do Dockerfile |
 | Healthcheck | `GET /` — responde `{"status":"ok"}` sem tocar no banco |
 
-### Por que existe um `.nvmrc`
+### Por que Dockerfile em vez de Nixpacks
 
-O `package.json` declara apenas `node >=20`, e o Nixpacks interpreta isso como
-"pegue a versao mais nova" — caiu no Node 24. O pnpm que o Nixpacks instala
-quebra nessa versao, no install, antes mesmo de rodar o build:
+A deteccao automatica do Nixpacks nao funciona neste repositorio. O
+`package.json` declara apenas `node >=20`, e ele resolvia isso para o Node 24;
+o pnpm que ele instala quebra nessa versao durante o proprio install, antes de
+chegar em qualquer comando de build:
 
 ```
 code: 'ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING'
 "pnpm i --frozen-lockfile" did not complete successfully: exit code: 1
 ```
 
-O `.nvmrc` na raiz fixa o Node 20 — a mesma versao que o CI do repositorio usa.
-Se a Railway ignorar o arquivo por algum motivo, o equivalente e criar a
-variavel `NIXPACKS_NODE_VERSION=20` no servico.
+Fixar o Node por `.nvmrc` nao resolveu. Com Dockerfile, a versao do Node e a do
+pnpm sao explicitas e iguais as do ambiente onde o build foi validado.
+
+O Nixpacks tambem criava **um servico por workspace** (`@tt-digita/web` e
+`@tt-digita/api`). Só a API deve existir na Railway; o servico do front pode ser
+removido.
 
 ### Por que `--prod=false` no install
 
 `@nestjs/cli`, `typescript` e `prisma` sao devDependencies. Com
-`NODE_ENV=production` setada nas variaveis do servico, o pnpm as ignoraria no
-install e o build quebraria em seguida (`nest: command not found`). O
-`--prod=false` obriga a instalacao completa durante o build.
+`NODE_ENV=production` definida no servico, o pnpm as ignoraria no install e o
+build quebraria em seguida (`nest: command not found`). O `--prod=false` obriga
+a instalacao completa.
 
 Variaveis de ambiente:
 
