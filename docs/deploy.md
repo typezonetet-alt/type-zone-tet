@@ -34,11 +34,24 @@ exige um redeploy — nao basta salvar a variavel.
 
 ## Railway (API)
 
-| Campo | Valor |
+O `railway.json` na raiz do repositorio ja define builder, build command, start
+command e healthcheck. A Railway le esse arquivo sozinha, entao **nao e preciso
+digitar comando nenhum no dashboard** — so configurar as variaveis e gerar o
+dominio.
+
+| Campo | Valor (ja vem do railway.json) |
 | --- | --- |
 | Root Directory | vazio (raiz do repo) |
-| Build Command | `pnpm install --frozen-lockfile && pnpm --filter @tt-digita/api build` |
+| Build Command | `pnpm install --frozen-lockfile --prod=false && pnpm --filter @tt-digita/api build` |
 | Start Command | `pnpm --filter @tt-digita/api start:prod` |
+| Healthcheck | `GET /` — responde `{"status":"ok"}` sem tocar no banco |
+
+### Por que `--prod=false` no install
+
+`@nestjs/cli`, `typescript` e `prisma` sao devDependencies. Com
+`NODE_ENV=production` setada nas variaveis do servico, o pnpm as ignoraria no
+install e o build quebraria em seguida (`nest: command not found`). O
+`--prod=false` obriga a instalacao completa durante o build.
 
 Variaveis de ambiente:
 
