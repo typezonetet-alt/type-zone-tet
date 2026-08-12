@@ -46,6 +46,21 @@ dominio.
 | Start Command | `pnpm --filter @tt-digita/api start:prod` |
 | Healthcheck | `GET /` — responde `{"status":"ok"}` sem tocar no banco |
 
+### Por que existe um `.nvmrc`
+
+O `package.json` declara apenas `node >=20`, e o Nixpacks interpreta isso como
+"pegue a versao mais nova" — caiu no Node 24. O pnpm que o Nixpacks instala
+quebra nessa versao, no install, antes mesmo de rodar o build:
+
+```
+code: 'ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING'
+"pnpm i --frozen-lockfile" did not complete successfully: exit code: 1
+```
+
+O `.nvmrc` na raiz fixa o Node 20 — a mesma versao que o CI do repositorio usa.
+Se a Railway ignorar o arquivo por algum motivo, o equivalente e criar a
+variavel `NIXPACKS_NODE_VERSION=20` no servico.
+
 ### Por que `--prod=false` no install
 
 `@nestjs/cli`, `typescript` e `prisma` sao devDependencies. Com
